@@ -395,9 +395,62 @@ static bool tryPatchFlash1MV103Gcc()
         sav_tryPatchFunction(sVerifyFlash1MV103GccSig, 3, (void*)verifyFlash);
 }
 
+// SoulGold v1.2.1 uses different GCC-generated Thumb prologues from Emerald Rogue.
+// These offsets are validated against this precise ROM layout before anything is patched.
+// Never use this for another ROM version unless its binary layout has been checked.
+static bool tryPatchSoulgold121()
+{
+    u8* const rom = (u8*)ROM_LINEAR_DS_ADDRESS;
+    if (memcmp(rom + 0xA0, "Soulgold", 8) != 0 ||
+        memcmp(rom + 0x204, "RHHEXP", 6) != 0 ||
+        memcmp(rom + 0x2144, "FLASH1M_V103", 13) != 0)
+    {
+        return false;
+    }
+
+    static const u32 identifySig[] = { 0x4A192103u, 0x430B8813u, 0x8013B510u, 0xFD7AF7FFu };
+    static const u32 readSig[] = { 0x2503B5F0u, 0x4C2446C6u, 0x001A4694u, 0x432B8823u };
+    static const u32 verifySectorSig[] = { 0x2503B5F0u, 0x88224C21u, 0x432A0003u, 0x24808022u };
+    static const u32 verifyNBytesSig[] = { 0x4C23B5F0u, 0x46AC6825u, 0x00034666u, 0x68362580u };
+    static const u32 expectedPointers[] = {
+        0x03002E0Cu, 0x03002E04u, 0x03002E14u, 0x03002E18u,
+        0x03002E00u, 0x03002E1Cu, 0x03002E08u
+    };
+
+    // All guards are checked before overwriting even one Thumb instruction.
+    if (memcmp(rom + 0x61B0, identifySig, sizeof(identifySig)) != 0 ||
+        memcmp(rom + 0x5F04, readSig, sizeof(readSig)) != 0 ||
+        memcmp(rom + 0x5FD8, verifySectorSig, sizeof(verifySectorSig)) != 0 ||
+        memcmp(rom + 0x607C, verifyNBytesSig, sizeof(verifyNBytesSig)) != 0 ||
+        memcmp(rom + 0x6224, expectedPointers, sizeof(expectedPointers)) != 0)
+    {
+        return false;
+    }
+
+    // IWRAM variable addresses were recovered from IdentifyFlash's literal pool.
+    // They are the same categories of pointers used by the existing Flash1M patch.
+    sPatchInfo.progBytePtr = (u32*)expectedPointers[0];
+    sPatchInfo.progSectorPtr = (u32*)expectedPointers[1];
+    sPatchInfo.eraseChipPtr = (u32*)expectedPointers[2];
+    sPatchInfo.eraseSectorPtr = (u32*)expectedPointers[3];
+    sPatchInfo.pollingSrPtr = (u32*)expectedPointers[4];
+    sPatchInfo.flMaxTimePtr = (u32*)expectedPointers[5];
+    sPatchInfo.flashPtr = (u32*)expectedPointers[6];
+
+    sav_swiTable[0] = (void*)identifyFlash1M;
+    sav_swiTable[1] = (void*)readFlash;
+    sav_swiTable[2] = (void*)verifyFlashSector;
+    sav_swiTable[3] = (void*)verifyFlash;
+    *(u16*)(rom + 0x61B0) = SAVE_THUMB_SWI(0);
+    *(u16*)(rom + 0x5F04) = SAVE_THUMB_SWI(1);
+    *(u16*)(rom + 0x5FD8) = SAVE_THUMB_SWI(2);
+    *(u16*)(rom + 0x607C) = SAVE_THUMB_SWI(3);
+    return true;
+}
+
 bool flash_patch1MV103(const SaveTypeInfo* saveTypeInfo, FIL* romFile, u32 tagRomAddress, u8* tempBuffer)
 {
-    if (tryPatchFlash1MV103Gcc())
+    if (tryPatchSoulgold121() || tryPatchFlash1MV103Gcc())
     {
         initializeFlash1M();
         return true;
