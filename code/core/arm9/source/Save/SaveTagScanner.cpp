@@ -123,12 +123,13 @@ const SaveTypeInfo* SaveTagScanner::GetSaveTypeInfoFromTag(SaveType saveType, co
         {
             continue;
         }
+        // Match only the actual tag bytes (including the NUL terminator).
+        // Padding beyond tagLength may contain valid ROM instructions/data.
         bool found = true;
-        u32 alignedTagLength = (saveTypeInfo.tagLength + 3) & ~3;
-        for (u32 j = 4; j < alignedTagLength; j += 4)
+        for (u32 j = 4; j < saveTypeInfo.tagLength; ++j)
         {
-            const u32 expected = *(u32*)&saveTypeInfo.tag[j];
-            const u32 actual = *(u32*)&tempBuffer[(searchBufPtr + j) & (SAVE_TAG_SCANNER_TEMP_BUFFER_SIZE - 1)];
+            const u8 expected = (u8)saveTypeInfo.tag[j];
+            const u8 actual = tempBuffer[(searchBufPtr + j) & (SAVE_TAG_SCANNER_TEMP_BUFFER_SIZE - 1)];
             if (actual != expected)
             {
                 found = false;
