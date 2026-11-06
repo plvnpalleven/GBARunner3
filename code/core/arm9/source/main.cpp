@@ -80,6 +80,12 @@ static NullLogger sNullLogger;
 ILogger* gLogger;
 static SplashScreen* sSplashScreen;
 
+// Diagnostic-only status: 1=no save tag, 2=saves disabled,
+// 3=Flash1M tag found (no patch), 4=patch failed,
+// 5=patch succeeded, 6=wrong save tag.
+// This is deliberately unused for other ROMs.
+static u8 sSoulgoldSaveProbe = 0;
+
 static void setupLogger()
 {
     if (Environment::IsIsNitroEmulator())
@@ -229,9 +235,16 @@ static void disableSramWrites(void)
 
 static void handleSave(const char* savePath)
 {
+    const bool probingSoulgold = memcmp((const u8*)ROM_LINEAR_DS_ADDRESS + 0xA0,
+        "Soulgold", 8) == 0;
+    if (probingSoulgold)
+        sSoulgoldSaveProbe = 1;
+
     const auto& gameSettings = gAppSettingsService.GetAppSettings().gameSettings;
     if (gameSettings.saveType == GbaSaveType::None)
     {
+        if (probingSoulgold)
+            sSoulgoldSaveProbe = 2;
         gLogger->Log(LogLevel::Debug, "Save Type: None\n");
         disableSramReads();
         disableSramWrites();
@@ -243,10 +256,18 @@ static void handleSave(const char* savePath)
     
     if (saveTypeInfo)
     {
+        const bool expectedSoulgoldTag = memcmp(saveTypeInfo->tag, "FLASH1M_V103", 13) == 0;
+        if (probingSoulgold)
+            sSoulgoldSaveProbe = expectedSoulgoldTag ? 3 : 6;
+
         gLogger->Log(LogLevel::Debug, "%s\n", saveTypeInfo->tag);
         if (saveTypeInfo->patchFunc)
         {
-            if (!saveTypeInfo->patchFunc(saveTypeInfo, &gFile, tagRomAddress, &sdc_cache[0][0]))
+            const bool patched = saveTypeInfo->patchFunc(saveTypeInfo, &gFile,
+                tagRomAddress, &sdc_cache[0][0]);
+            if (probingSoulgold && expectedSoulgoldTag)
+                sSoulgoldSaveProbe = patched ? 5 : 4;
+            if (!patched)
             {
                 gLogger->Log(LogLevel::Error, "Save patching failed\n");
             }
@@ -262,6 +283,10 @@ static void handleSave(const char* savePath)
             disableSramWrites();
         }
     }
+
+    // Diagnostic build: do not create or alter a SoulGold .sav file.
+    if (probingSoulgold)
+        return;
 
     sav_initializeSave(saveTypeInfo, savePath);
 }
@@ -504,6 +529,38 @@ extern "C" void gbaRunnerMain(int argc, char* argv[])
         gLogger->Log(LogLevel::Debug, "pokeemerald-expansion jit patch addresses applied\n");
     }
     handleSave(romPath);
+
+    // Diagnostic ONLY: display status on the top screen and stop before
+    // launching the GBA VM. Never reads/writes SoulGold save files.
+    if (sSoulgoldSaveProbe != 0)
+    {
+        waitSplashScreenAnimation();
+        stopSplashScreenAnimation();
+        delete sSplashScreen;
+        sSplashScreen = nullptr;
+
+        // VRAM B is not where the executable lives; safe to use as a
+        // 256x192 diagnostic framebuffer after the splash finishes.
+        mem_setVramBMapping(MEM_VRAM_AB_LCDC);
+        vu16* const framebuffer = (vu16*)0x06820000;
+        u16 color = 0x7C00; // blue: unknown
+        switch (sSoulgoldSaveProbe)
+        {
+            case 1: color = 0x001F; break; // RED: save tag not found
+            case 2: color = 0x7C1F; break; // MAGENTA: save disabled
+            case 3: color = 0x03FF; break; // YELLOW: tag found, no patch
+            case 4: color = 0x01FF; break; // ORANGE: Flash patch failed
+            case 5: color = 0x03E0; break; // GREEN: Flash patch applied
+            case 6: color = 0x7FE0; break; // CYAN: unexpected save tag
+        }
+        for (u32 i = 0; i < 256u * 192u; ++i)
+            framebuffer[i] = color | 0x8000;
+
+        REG_MASTER_BRIGHT = 0;
+        REG_DISPCNT = (2u << 16) | (1u << 18); // Show VRAM bank B
+        while (true) {} // Intentional: diagnostic does not run the game
+    }
+
     SelfModifyingPatches().ApplyPatches(gAppSettingsService.GetAppSettings().runSettings);
 
     waitSplashScreenAnimation();
