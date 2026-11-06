@@ -1,6 +1,7 @@
 #include "common.h"
 #include <string.h>
 #include <libtwl/mem/memSwap.h>
+#include <libtwl/gfx/gfxPalette.h>
 #include "MemFastSearch.h"
 #include "Save.h"
 #include "SaveSwi.h"
@@ -40,6 +41,11 @@ struct flash_patchinfo_t
 
 static flash_patchinfo_t sPatchInfo;
 static flash_v120_type sFlashType;
+
+// SoulGold-only runtime probe: DS bottom-screen backdrop is a debug indicator.
+// RED: compatibility patch installed but IdentifyFlash has not entered.
+// YELLOW: IdentifyFlash entered; GREEN: IdentifyFlash finished.
+static bool sSoulgoldRuntimeProbeEnabled = false;
 static const u16 sMaxTime[] = { 0xA, 0xFFBD, 0xC2, 0xA, 0xFFBD, 0xC2, 0x28, 0xFFBD, 0xC2, 0xC8, 0xFFBD, 0xC2 };
 
 static void readFlash(u16 secNo, u32 offset, u8* dst, u32 size)
@@ -144,6 +150,9 @@ static void initializeFlash512()
 
 static u16 identifyFlash1M()
 {
+    if (sSoulgoldRuntimeProbeEnabled)
+        GFX_PLTT_BG_SUB[0] = 0x03FF; // yellow: entered
+
     *sPatchInfo.progSectorPtr = (u32)sav_callSwi8;
     if (sPatchInfo.progBytePtr)
     {
@@ -154,6 +163,8 @@ static u16 identifyFlash1M()
     *sPatchInfo.pollingSrPtr = 0;
     *sPatchInfo.flMaxTimePtr = (u32)sMaxTime;
     *sPatchInfo.flashPtr = (u32)&sFlashType;
+    if (sSoulgoldRuntimeProbeEnabled)
+        GFX_PLTT_BG_SUB[0] = 0x03E0; // green: all pointer assignments finished
     return 0;
 }
 
@@ -445,6 +456,8 @@ static bool tryPatchSoulgold121()
     *(u16*)(rom + 0x5F04) = SAVE_THUMB_SWI(1);
     *(u16*)(rom + 0x5FD8) = SAVE_THUMB_SWI(2);
     *(u16*)(rom + 0x607C) = SAVE_THUMB_SWI(3);
+    sSoulgoldRuntimeProbeEnabled = true;
+    GFX_PLTT_BG_SUB[0] = 0x001F; // red: patch installed but not yet invoked
     return true;
 }
 
