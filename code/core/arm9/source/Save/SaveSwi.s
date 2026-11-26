@@ -552,15 +552,24 @@ sgTraceInvalidFetch:
     ldr r13, =sgTraceFaultRegs
     stmia r13, {sp,lr}^
     nop
-    ldr r0, sgTraceFaultRegs
-    sg_hex 0x062042C4 // user SP
-    ldr r13, =vm_cpsr
-    ldr r0, [r13]
-    sg_hex 0x062042DC // virtual GBA CPSR (mode and IRQ mask)
+    ldr r0, sgTraceFaultRegs + 4
+    sg_hex 0x062042C4 // live guest LR at abort
+    mrs r0, spsr
+    sg_hex 0x062042DC // actual interrupted CPSR, including ARM/Thumb state
+    ldr r13, =vm_regs_svc
+    ldr r0, [r13, #4]
+    sg_hex 0x06204544 // saved virtual supervisor LR (BIOS return context)
     ldr r0, sgFaultReturnTarget
     sg_hex 0x0620455C // latest wait LR, or previous transition result
-    ldr r0, sgFaultCallStage
-    sg_hex 0x06204044 // last callback call stage, replaces save caller
+    ldr r13, =memu_biosOpcodeId
+    ldrb r0, [r13]
+    mov r0, r0, lsl #16
+    ldr r13, =vm_cpsr
+    ldrb r13, [r13]
+    orr r0, r0, r13, lsl #8
+    ldr r13, sgFaultCallStage
+    orr r0, r0, r13
+    sg_hex 0x06204044 // 00 BB CC SS: BIOS opcode ID, virtual CPSR, stage
 1:
     b 1b
 
