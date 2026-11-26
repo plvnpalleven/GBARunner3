@@ -515,6 +515,14 @@ sgTraceVblankBiosDispatch:
     bne 1f
     ldrb r13, [lr, #-2]
     str r13, sgLastSwiOpcode
+    cmp r13, #0x0B
+    bne 1f
+    // Record the original CpuSet arguments before entering the BIOS.
+    str r0, sgCpuSetSource
+    str r1, sgCpuSetDestination
+    str r2, sgCpuSetControl
+    mov r13, #0
+    str r13, sgCpuSetReturn
 1:
     mov r13, #0
     ldr pc, =vm_swiSoulgoldResume
@@ -531,6 +539,22 @@ sgTraceBiosExceptionReturn:
     streq r10, sgLastExceptionSource
     streq r8, sgLastExceptionTarget
     streq r12, sgLastExceptionSpsr
+    bne 2f
+    // Distinguish the BIOS SWI exit from ordinary IRQ returns.
+    stmdb sp!, {r10}
+    ldr r10, sgLastExceptionSource
+    // Compare source to relocated BIOS SWI exit using saved scratch.
+    stmdb sp!, {r11}
+    ldr r11, =gGbaBios + 0x18C
+    cmp r10, r11
+    ldmia sp!, {r11}
+    bne 1f
+    ldr r10, sgLastSwiOpcode
+    cmp r10, #0x0B
+    streq r8, sgCpuSetReturn
+1:
+    ldmia sp!, {r10}
+2:
     bx lr
 
 // Capture the actual user-bank LR after the VM restores the destination mode.
@@ -614,14 +638,14 @@ sgTraceInvalidFetch:
     ldr r13, =sgTraceFaultRegs
     stmia r13, {sp,lr}^
     nop
-    ldr r0, sgRestoredGuestLink
-    sg_hex 0x062042C4 // user LR just after virtual mode restoration
-    ldr r0, sgLastExceptionSource
-    sg_hex 0x062042DC // return instruction address + 4
-    ldr r0, sgLastNormalSwi
-    sg_hex 0x06204544 // last normal SWI return address
-    ldr r0, sgLastSwiGuestLink
-    sg_hex 0x0620455C // user LR at last ordinary SWI entry
+    ldr r0, sgCpuSetSource
+    sg_hex 0x062042C4 // CpuSet source
+    ldr r0, sgCpuSetDestination
+    sg_hex 0x062042DC // CpuSet destination
+    ldr r0, sgCpuSetControl
+    sg_hex 0x06204544 // CpuSet control
+    ldr r0, sgCpuSetReturn
+    sg_hex 0x0620455C // actual BIOS SWI return destination; zero until observed
     ldr r13, =memu_biosOpcodeId
     ldrb r0, [r13]
     mov r0, r0, lsl #16
@@ -637,6 +661,14 @@ sgTraceInvalidFetch:
     b 1b
 
 .balign 4
+sgCpuSetSource:
+    .word 0
+sgCpuSetDestination:
+    .word 0
+sgCpuSetControl:
+    .word 0
+sgCpuSetReturn:
+    .word 0
 sgLastSwiOpcode:
     .word 0xFF
 sgLastSwiGuestLink:
