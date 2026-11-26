@@ -305,31 +305,24 @@ soulGoldTraceSecondReturn:
 
 soulGoldTraceResourceReturn:
     and r13, lr, #0xFF
-    cmp r13, #0x30
-    beq sgFaultCall1
-    cmp r13, #0x34
-    beq sgFaultCall2
-    cmp r13, #0x38
-    beq sgFaultCall3
-    cmp r13, #0x3C
-    beq sgFaultCall4
-    cmp r13, #0x70
-    beq sgPaletteEntry
     cmp r13, #0x42
     beq sgPaletteCallbackExit
-    // 0x0C is also used by the alternate main-loop hook.
-    cmp r13, #0x0C
-    bne 8f
-    str r0, sgTraceSavedR0
-    ldr r0, =0x023C560C
-    cmp lr, r0
-    ldreq r0, sgTraceSavedR0
-    beq sgPaletteExit
-    ldr r0, =0x081C560C
-    cmp lr, r0
-    ldr r0, sgTraceSavedR0
-    beq sgPaletteExit
-8:
+    cmp r13, #0x16
+    beq sgPostReturn
+    cmp r13, #0x9a
+    beq sgPostCheckCall
+    cmp r13, #0x9e
+    beq sgPostCheckReturn
+    cmp r13, #0xac
+    beq sgPostExtraReturn
+    cmp r13, #0xe
+    beq sgPostLoop
+    cmp r13, #0x8e
+    beq sgPostAlternate
+    cmp r13, #0xba
+    beq sgPostCallbackOne
+    cmp r13, #0xce
+    beq sgPostOtherReturn
     // Original 0x6863: LDR r3,[r4,#4]. Record only after guest epilogue.
     ldr r3, [r4, #4]
     str r0, sgTraceSavedR0
@@ -364,52 +357,62 @@ soulGoldTraceResourceReturn:
 1:
     movs pc, lr
 
-// Record the most recent BL prefix without drawing or pausing.
-.macro sg_fault_prefix stage, offset
+// Record stage with no guest register or flag changes.
+.macro sg_post_stage stage
+    mov r13, #\stage
+    str r13, sgFaultCallStage
+.endm
+sgPostReturn:
+    sg_post_stage 8
+    // Original Thumb B at 1A7114 targets 1A7098.
+    sub lr, lr, #0x7E
+    movs pc, lr
+sgPostCheckCall:
+    sg_post_stage 9
+    // Original Thumb BL prefix F01B; suffix FE1C remains native.
     str r0, sgTraceSavedR0
-    mov r0, #\stage
-    str r0, sgFaultCallStage
-    ldr r13, =\offset
     add r0, lr, #2
-    add r0, r0, r13
+    add r0, r0, #0x1B000
     str r0, sgFaultGuestLink
     ldr r13, =sgFaultGuestLink
     ldmia r13, {lr}^
     nop
     ldr r0, sgTraceSavedR0
     movs pc, lr
-.endm
-sgFaultCall1:
-    sg_fault_prefix 1, 0x115000
-sgFaultCall2:
-    sg_fault_prefix 2, 0x100000
-sgFaultCall3:
-    sg_fault_prefix 3, 0x102000
-sgFaultCall4:
-    sg_fault_prefix 4, 0x078000
+sgPostCheckReturn:
+    mov r11, r0
+    sg_post_stage 0xA
+    movs pc, lr
+sgPostExtraReturn:
+    mov r3, #0x41
+    // MOVS sets N/Z, preserves C/V.
+    mrs r13, spsr
+    bic r13, r13, #0xC0000000
+    msr spsr_f, r13
+    sg_post_stage 0xB
+    movs pc, lr
+sgPostLoop:
+    mov r3, r8
+    sg_post_stage 0xC
+    movs pc, lr
+sgPostAlternate:
+    mov r2, #0
+    mrs r13, spsr
+    bic r13, r13, #0x80000000
+    orr r13, r13, #0x40000000
+    msr spsr_f, r13
+    sg_post_stage 0xD
+    movs pc, lr
+sgPostCallbackOne:
+    ldr r3, [r4]
+    sg_post_stage 0xE
+    movs pc, lr
+sgPostOtherReturn:
+    sg_post_stage 0xF
+    // Original B at 1A70CC targets 1A7068.
+    sub lr, lr, #0x66
+    movs pc, lr
 
-// At entry the two pushes total 32 bytes; original LR at SP+28.
-// At epilogue locals and high regs are popped, original LR at SP+16.
-.macro sg_palette_snapshot stage, offset
-    str r0, sgTraceSavedR0
-    ldr r13, =sgFaultGuestSp
-    stmia r13, {sp}^
-    nop
-    ldr r13, sgFaultGuestSp
-    ldr r0, [r13, #\offset]
-    str r0, sgFaultReturnTarget
-    mov r0, #\stage
-    str r0, sgFaultCallStage
-    ldr r0, sgTraceSavedR0
-.endm
-sgPaletteEntry:
-    sg_palette_snapshot 5, 28
-    ldr r4, =0x02038318
-    movs pc, lr
-sgPaletteExit:
-    sg_palette_snapshot 6, 16
-    mov r8, r5
-    movs pc, lr
 sgPaletteCallbackExit:
     str r0, sgFaultReturnTarget
     mov r13, #7
@@ -480,8 +483,6 @@ sgTraceInvalidFetch:
     b 1b
 
 .balign 4
-sgFaultGuestSp:
-    .word 0
 sgFaultReturnTarget:
     .word 0
 sgFaultCallStage:
