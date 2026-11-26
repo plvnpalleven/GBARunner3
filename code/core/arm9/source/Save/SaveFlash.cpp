@@ -409,13 +409,6 @@ static bool tryPatchFlash1MV103Gcc()
 // SoulGold v1.2.1 uses different GCC-generated Thumb prologues from Emerald Rogue.
 // These offsets are validated against this precise ROM layout before anything is patched.
 // Never use this for another ROM version unless its binary layout has been checked.
-// Diagnostic-only callback. Deliberately no memory or display accesses:
-// the save SWI handler calls this function in ARM user mode.
-static u16 soulGoldIdentifyFailureControl()
-{
-    return 1;
-}
-
 static bool tryPatchSoulgold121()
 {
     u8* const rom = (u8*)ROM_LINEAR_DS_ADDRESS;
@@ -455,12 +448,48 @@ static bool tryPatchSoulgold121()
     sPatchInfo.flMaxTimePtr = (u32*)expectedPointers[5];
     sPatchInfo.flashPtr = (u32*)expectedPointers[6];
 
-    // Same failure return as experiment 010, but via the original
-    // GBARunner3 SWI dispatch path. No writes from the callback.
-    sav_swiTable[0] = (void*)soulGoldIdentifyFailureControl;
-    *(u16*)(rom + 0x61B0) = SAVE_THUMB_SWI(0);
+    // SoulGold 1.2.1: retain the original IdentifyFlash routine, including
+    // its native FlashSetupInfo selection and seven IWRAM pointer writes.
+    // The verified BL at 0x61BC targets ReadFlashId at 0x5CB4. Return
+    // the game's own MX29L010 ID (0x09C2) from that routine instead of
+    // accessing physical cartridge Flash that the DSi does not provide.
+    static const u32 idSig[] = { 0xB091B530u, 0x2201466Bu, 0x4B281D5Cu, 0x601C4928u };
+    // Native MX29L010 callback entrypoints from the ROM's FlashSetupInfo.
+    static const u32 byteSig[] = { 0x46C6B5F0u, 0x04004E1Fu, 0xB5000C03u, 0x68334698u };
+    static const u32 sectorSig[] = { 0x4657B5F0u, 0x4645464Eu, 0xB5E046DEu, 0x68234C2Eu };
+    static const u32 eraseChipSig[] = { 0xB5302103u, 0x258020AAu, 0x4C134B12u, 0x8822681Bu };
+    static const u32 eraseSectorSig[] = { 0x464FB5F0u, 0x464646D6u, 0x4F29B5C0u, 0x895B683Bu };
+    if (memcmp(rom + 0x5CB4, idSig, sizeof(idSig)) != 0 ||
+        memcmp(rom + 0x640C, byteSig, sizeof(byteSig)) != 0 ||
+        memcmp(rom + 0x64A4, sectorSig, sizeof(sectorSig)) != 0 ||
+        memcmp(rom + 0x62DC, eraseChipSig, sizeof(eraseChipSig)) != 0 ||
+        memcmp(rom + 0x6344, eraseSectorSig, sizeof(eraseSectorSig)) != 0)
+    {
+        return false;
+    }
+
+    // Thumb: ldr r0, [pc, #0]; bx lr; .word 0x000009C2.
+    *(u16*)(rom + 0x5CB4) = 0x4800;
+    *(u16*)(rom + 0x5CB6) = 0x4770;
+    *(u32*)(rom + 0x5CB8) = 0x000009C2;
+
+    // The native setup table continues to point into the ROM, but the
+    // actual Flash operations dispatch through GBARunner3's save hooks.
+    // initializeFlash1M() populates the SWI 8..11 callbacks.
+    sav_swiTable[1] = (void*)readFlash;
+    sav_swiTable[2] = (void*)verifyFlashSector;
+    sav_swiTable[3] = (void*)verifyFlash;
+    *(u16*)(rom + 0x5F04) = SAVE_THUMB_SWI(1);
+    *(u16*)(rom + 0x5FD8) = SAVE_THUMB_SWI(2);
+    *(u16*)(rom + 0x607C) = SAVE_THUMB_SWI(3);
+    *(u16*)(rom + 0x64A4) = SAVE_THUMB_SWI(8);
+    *(u16*)(rom + 0x640C) = SAVE_THUMB_SWI(9);
+    *(u16*)(rom + 0x62DC) = SAVE_THUMB_SWI(10);
+    *(u16*)(rom + 0x6344) = SAVE_THUMB_SWI(11);
+
+    // No runtime writes to restricted hardware display registers.
     sSoulgoldRuntimeProbeEnabled = false;
-    GFX_PLTT_BG_SUB[0] = 0x7C1F; // magenta: SWI failure-control installed
+    GFX_PLTT_BG_SUB[0] = 0x7FE0; // cyan: native-init experiment installed
     return true;
 }
 
