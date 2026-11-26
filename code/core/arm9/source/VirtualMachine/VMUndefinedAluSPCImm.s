@@ -52,6 +52,10 @@ vm_armUndefinedAluSPCImm:
     and r11, r11, #0xF
     add r12, r9, r11, lsl #2
     ldr r12, [r12, #(vm_spsr - vm_armUndefinedDispatchTable)] // r12 = spsr
+#ifndef GBAR3_TEST
+    ldr r10, [r9, #(vm_undefinedInstructionAddr - vm_armUndefinedDispatchTable)]
+    bl sgTraceBiosExceptionReturn
+#endif
     ldr lr, [r9, #(vm_modeSwitchTableAddr - vm_armUndefinedDispatchTable)]
     and r10, r12, #0xDF
     strb r10, [r9, #(vm_cpsr - vm_armUndefinedDispatchTable)]

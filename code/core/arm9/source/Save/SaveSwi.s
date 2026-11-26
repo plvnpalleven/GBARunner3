@@ -493,10 +493,28 @@ sgTraceVblankBiosDispatch:
     ldr r13, sgTraceCallbackCount
     cmp r13, #0
     beq 1f
-    sg_post_stage 0x1E
+    ldr r13, =0x0220030C
+    cmp lr, r13
+    moveq r13, #0x1E
+    streq r13, sgFaultCallStage
+    ldr r13, sgFaultCallStage
+    cmp r13, #0x1E
+    streq lr, sgLastNormalSwi
 1:
     mov r13, #0
     ldr pc, =vm_swiSoulgoldResume
+
+// FIQ-mode hook before the virtual mode switch. r8 = computed destination,
+// r12 = virtual SPSR, r10 = undefined instruction return address.
+// Only FIQ-banked scratch r10 is modified; r11 still holds old mode.
+.global sgTraceBiosExceptionReturn
+sgTraceBiosExceptionReturn:
+    str r10, sgLastExceptionSource
+    ldr r10, sgFaultCallStage
+    cmp r10, #0x1E
+    streq r8, sgLastExceptionTarget
+    streq r12, sgLastExceptionSpsr
+    bx lr
 
 sgVblankWaitExit:
     str r0, sgTraceSavedR0
@@ -567,15 +585,14 @@ sgTraceInvalidFetch:
     ldr r13, =sgTraceFaultRegs
     stmia r13, {sp,lr}^
     nop
-    ldr r0, sgTraceFaultRegs + 4
-    sg_hex 0x062042C4 // live guest LR at abort
-    mrs r0, spsr
-    sg_hex 0x062042DC // actual interrupted CPSR, including ARM/Thumb state
-    ldr r13, =vm_regs_svc
-    ldr r0, [r13, #4]
-    sg_hex 0x06204544 // saved virtual supervisor LR (BIOS return context)
-    ldr r0, sgFaultReturnTarget
-    sg_hex 0x0620455C // latest wait LR, or previous transition result
+    ldr r0, sgLastExceptionTarget
+    sg_hex 0x062042C4 // computed virtual exception return target
+    ldr r0, sgLastExceptionSource
+    sg_hex 0x062042DC // return instruction address + 4
+    ldr r0, sgLastNormalSwi
+    sg_hex 0x06204544 // last normal SWI return address
+    ldr r0, sgLastExceptionSpsr
+    sg_hex 0x0620455C // virtual SPSR for the recorded return
     ldr r13, =memu_biosOpcodeId
     ldrb r0, [r13]
     mov r0, r0, lsl #16
@@ -589,6 +606,14 @@ sgTraceInvalidFetch:
     b 1b
 
 .balign 4
+sgLastNormalSwi:
+    .word 0
+sgLastExceptionTarget:
+    .word 0
+sgLastExceptionSource:
+    .word 0
+sgLastExceptionSpsr:
+    .word 0
 sgWaitEntryLink:
     .word 0
 sgWaitExitLink:

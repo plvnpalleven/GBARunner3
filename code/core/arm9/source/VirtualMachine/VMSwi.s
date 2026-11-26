@@ -109,13 +109,7 @@ hicodeLoadFromCache:
 // Use unused mode-table padding; keep all fixed ITCM offsets unchanged.
 #ifndef GBAR3_TEST
 sgCheckVblankSwi:
-    ldr r13, sgVblankSwiAddress
-    cmp lr, r13
-    ldreq pc, sgVblankSwiHook
-    mov r13, #0
-    b vm_swiSoulgoldResume
-sgVblankSwiAddress:
-    .word 0x0220030C
+    ldr pc, sgVblankSwiHook
 sgVblankSwiHook:
     .word sgTraceVblankBiosDispatch
 #endif
