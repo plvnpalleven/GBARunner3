@@ -9,7 +9,7 @@ arm_func emu_vblankIrq
     ldr r13, =gSoulgoldTraceEnabled
     ldrb r13, [r13]
     cmp r13, #0
-    bne emu_vblankDmaJumpInstruction
+    bne sgVblankSample
     // For center and mask display capture has to be enabled every frame
     // and the buffers need to be swapped
 jumpToCaptureUpdate:

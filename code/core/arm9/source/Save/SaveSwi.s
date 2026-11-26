@@ -504,30 +504,50 @@ sgVblankWaitExit:
 // necessarily the exact faulting PC, but shows what the IRQ interrupted.
 .global sgTraceVblankSample
 sgTraceVblankSample:
-    ldr r1, sgTraceCallbackCount
-    cmp r1, #0
-    bxeq lr
-    ldr r1, =0x0620405C
-    mov r3, #8
+    // r0 is the interrupted PC. Sample only after the verified audio hook.
+    // No guest instruction replacements or guest memory writes.
+    ldr r1, sgFaultCallStage
+    cmp r1, #3
+    bxlo lr
+    mov r12, r0
+    ldr r1, sgTraceVblankCount
+    add r1, r1, #1
+    str r1, sgTraceVblankCount
+    // Verified Main struct base from ROM literal 081A7130.
+    ldr r2, =0x030055C4
+    ldr r2, [r2]
+    ldr r3, sgSampleCurrentCallback
+    cmp r2, r3
+    beq 1f
+    str r3, sgSamplePreviousCallback
+    str r2, sgSampleCurrentCallback
+    b 2f
 1:
-    mov r2, r0, lsr #28
-    add r2, r2, #16
-    strh r2, [r1], #2
-    mov r0, r0, lsl #4
-    subs r3, r3, #1
-    bne 1b
-    ldr r0, sgTraceVblankCount
-    add r0, r0, #1
-    str r0, sgTraceVblankCount
-    ldr r1, =0x0620455C
-    mov r3, #8
+    tst r1, #15
+    bxne lr
 2:
-    mov r2, r0, lsr #28
-    add r2, r2, #16
-    strh r2, [r1], #2
-    mov r0, r0, lsl #4
-    subs r3, r3, #1
-    bne 2b
+    // Use only registers saved by the caller. r13 is the IRQ stack.
+    mov r0, r12
+    .macro sg_sample_hex destination
+        ldr r1, =\destination
+        mov r3, #8
+    .Lsg_sample_loop\@:
+        mov r2, r0, lsr #28
+        add r2, r2, #16
+        strh r2, [r1], #2
+        mov r0, r0, lsl #4
+        subs r3, r3, #1
+        bne .Lsg_sample_loop\@
+    .endm
+    sg_sample_hex 0x0620405C // latest sampled interrupt PC
+    ldr r0, sgSampleCurrentCallback
+    sg_sample_hex 0x062042C4
+    ldr r0, sgSamplePreviousCallback
+    sg_sample_hex 0x062042DC
+    ldr r0, sgLastHicodePrefetch
+    sg_sample_hex 0x06204544
+    ldr r0, sgTraceVblankCount
+    sg_sample_hex 0x0620455C
     bx lr
 
 // Compare actual mixer bytes against a verified ROM copy. Correct only
@@ -582,7 +602,7 @@ sgVerifyMixerCopy:
     cmp r2, r3
     blo 3b
     ldr r0, sgFaultCallStage
-    orr r0, r0, #0x53000000
+    orr r0, r0, #0x55000000
     sg_hex 0x06204044
     ldr r1, sgMixerSavedR1
     ldr r2, sgMixerSavedR2
@@ -620,8 +640,8 @@ sgTraceInvalidFetch:
     orr r0, r0, r13, lsl #8
     ldr r13, sgFaultCallStage
     orr r0, r0, r13
-    orr r0, r0, #0x53000000
-    sg_hex 0x06204044 // 53 BB CC SS: build ID, BIOS phase, VM CPSR, copy status
+    orr r0, r0, #0x55000000
+    sg_hex 0x06204044 // 55 BB CC SS: build ID, BIOS phase, VM CPSR, copy status
 1:
     b 1b
 
@@ -675,6 +695,10 @@ sgFaultGuestLink:
     .word 0
 sgTraceFaultRegs:
     .space 8
+sgSampleCurrentCallback:
+    .word 0
+sgSamplePreviousCallback:
+    .word 0
 sgTraceVblankCount:
     .word 0
 sgTraceSavedR0:
