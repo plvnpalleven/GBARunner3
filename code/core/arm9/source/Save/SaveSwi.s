@@ -372,19 +372,37 @@ soulGoldTraceResourceReturn:
 
 sgWaitForR:
     str r0, sgStepSavedR0
+    // Tile 1 doubles as persistent input acknowledgement. Accept A or R.
+    ldr r13, =0x05000402
+    ldr r0, =0x7C1F // magenta: reached input polling
+    strh r0, [r13]
     ldr r13, =0x04000130
 1:
     ldrh r0, [r13]
+    tst r0, #1
+    beq 1b
     tst r0, #0x100
     beq 1b
 2:
     ldrh r0, [r13]
+    tst r0, #1
+    beq 4f
     tst r0, #0x100
     bne 2b
+4:
+    ldr r13, =0x05000402
+    ldr r0, =0x03FF // yellow: press detected
+    strh r0, [r13]
+    ldr r13, =0x04000130
 3:
     ldrh r0, [r13]
+    tst r0, #1
+    beq 3b
     tst r0, #0x100
     beq 3b
+    ldr r13, =0x05000402
+    ldr r0, =0x03E0 // green: released, about to resume guest
+    strh r0, [r13]
     ldr r0, sgStepSavedR0
     bx lr
 
