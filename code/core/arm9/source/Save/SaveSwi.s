@@ -318,16 +318,28 @@ soulGoldTraceResourceReturn:
     beq sgTaskReturn
     cmp r13, #0x5C
     beq sgTaskExit
-    cmp r13, #0x30
-    beq sgCallbackCall1
-    cmp r13, #0x34
-    beq sgCallbackCall2
-    cmp r13, #0x38
-    beq sgCallbackCall3
-    cmp r13, #0x3C
-    beq sgCallbackCall4
-    cmp r13, #0x42
-    beq sgCallbackExit
+    cmp r13, #0x54
+    beq sgTitleTask0
+    cmp r13, #0x5E
+    beq sgTitleTask1
+    cmp r13, #0xCC
+    beq sgTitleTask2
+    cmp r13, #0xD8
+    beq sgTitleTask3
+    cmp r13, #0xF2
+    beq sgTitleTask4
+    cmp r13, #0x1A
+    beq sgTitleTask5
+    cmp r13, #0x24
+    beq sgTitleTask6
+    cmp r13, #0x2C
+    beq sgTitleTask7
+    cmp r13, #0x40
+    beq sgTitleTask8
+    cmp r13, #0x46
+    beq sgTitleTask9
+    cmp r13, #0x66
+    beq sgTitleTask10
     // Original 0x6863: LDR r3,[r4,#4]. Record only after guest epilogue.
     ldr r3, [r4, #4]
     str r0, sgTraceSavedR0
@@ -357,35 +369,71 @@ soulGoldTraceResourceReturn:
 1:
     movs pc, lr
 
-// Display call number at bottom right, retaining existing hex counters.
-// ARM7 Thumb BL prefix sets guest LR = instruction address+4+imm11*4096.
-// SWI LR is instruction address+2. Write the user-bank LR, leaving
-// the original BL suffix to branch and set its normal return address.
-.macro sg_callback_prefix stage, offset
+// All title-task probes share a compact stage renderer.
+sgTitleTask0:
+    ldr r7, =0x3005B4C
+    mov r13, #0x20
+    b sgTitleStage
+
+sgTitleTask1:
+    ldrsh r6, [r5, r3]
+    add r13, r6, #0x21
+    b sgTitleStage
+
+sgTitleTask2:
+    ldr r0, =0x814C79D
+    mov r13, #0x30
+    b sgTitleStage
+
+sgTitleTask3:
+    ldr r4, =0x85B6C5C
+    mov r13, #0x31
+    b sgTitleStage
+
+sgTitleTask4:
+    ldr r1, =0x8C4
+    mov r13, #0x32
+    b sgTitleStage
+
+sgTitleTask5:
+    ldr r0, =0x85B7F74
+    mov r13, #0x33
+    b sgTitleStage
+
+sgTitleTask6:
+    ldr r1, =0x600B000
+    mov r13, #0x34
+    b sgTitleStage
+
+sgTitleTask7:
+    ldr r0, =0x85B7A40
+    mov r13, #0x35
+    b sgTitleStage
+
+sgTitleTask8:
+    ldr r0, =0x85B774C
+    mov r13, #0x36
+    b sgTitleStage
+
+sgTitleTask9:
+    ldr r4, =0x85B6CDC
+    mov r13, #0x37
+    b sgTitleStage
+
+sgTitleTask10:
+    ldr r1, =0x2038334
+    mov r13, #0x38
+    b sgTitleStage
+
+sgTitleStage:
     str r0, sgTraceHexSavedR0
     str r12, sgTraceHexSavedR12
-    mov r0, #\stage
+    mov r0, r13
     sg_hex 0x0620455C
-    ldr r13, =\offset
-    add r0, lr, #2
-    add r0, r0, r13
-    str r0, sgTraceGuestLink
-    ldr r13, =sgTraceGuestLink
-    ldmia r13, {lr}^
-    nop
     ldr r12, sgTraceHexSavedR12
     ldr r0, sgTraceHexSavedR0
     movs pc, lr
-.endm
 
-sgCallbackCall1:
-    sg_callback_prefix 1, 0x115000
-sgCallbackCall2:
-    sg_callback_prefix 2, 0x100000
-sgCallbackCall3:
-    sg_callback_prefix 3, 0x102000
-sgCallbackCall4:
-    sg_callback_prefix 4, 0x078000
 // Retain bottom-left loop counter, put scheduler stage bottom-right.
 // The active task function pointer is written top-right.
 .macro sg_task_stage stage
@@ -423,8 +471,6 @@ sgTaskExit:
     sg_task_stage 0x14
     b sgTraceBxR0
 
-sgCallbackExit:
-    sg_task_stage 5
 sgTraceBxR0:
     // Emulate BX r0, including ARM/Thumb state.
     mov lr, r0
@@ -438,8 +484,6 @@ sgTraceBxR0:
     movs pc, lr
 
 .balign 4
-sgTraceGuestLink:
-    .word 0
 sgTraceSavedR0:
     .word 0
 sgTraceHexSavedR0:

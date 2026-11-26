@@ -490,6 +490,27 @@ static bool tryPatchSoulgold121()
         *(u16*)(rom + 0x14C93C) != 0xFE13 ||
         *(u16*)(rom + 0x14C93E) != 0xBC01 ||
         *(u16*)(rom + 0x14C940) != 0x4700 ||
+        *(u16*)(rom + 0x14C952) != 0x4F75 ||
+        *(u32*)(rom + 0x14CB28) != 0x3005B4C ||
+        *(u16*)(rom + 0x14C95C) != 0x5EEE ||
+        *(u16*)(rom + 0x14C9CA) != 0x485C ||
+        *(u32*)(rom + 0x14CB3C) != 0x814C79D ||
+        *(u16*)(rom + 0x14C9D6) != 0x4C5A ||
+        *(u32*)(rom + 0x14CB40) != 0x85B6C5C ||
+        *(u16*)(rom + 0x14C9F0) != 0x4954 ||
+        *(u32*)(rom + 0x14CB44) != 0x8C4 ||
+        *(u16*)(rom + 0x14CA18) != 0x484B ||
+        *(u32*)(rom + 0x14CB48) != 0x85B7F74 ||
+        *(u16*)(rom + 0x14CA22) != 0x494A ||
+        *(u32*)(rom + 0x14CB4C) != 0x600B000 ||
+        *(u16*)(rom + 0x14CA2A) != 0x4849 ||
+        *(u32*)(rom + 0x14CB50) != 0x85B7A40 ||
+        *(u16*)(rom + 0x14CA3E) != 0x4848 ||
+        *(u32*)(rom + 0x14CB60) != 0x85B774C ||
+        *(u16*)(rom + 0x14CA44) != 0x4C47 ||
+        *(u32*)(rom + 0x14CB64) != 0x85B6CDC ||
+        *(u16*)(rom + 0x14CA64) != 0x4940 ||
+        *(u32*)(rom + 0x14CB68) != 0x2038334 ||
         *(u16*)(rom + 0x1A70C2) != 0x6863 ||
         *(u16*)(rom + 0x1A710A) != 0x6863 ||
         *(u16*)(rom + 0x11F8A4) != 0x4650 ||
@@ -544,14 +565,19 @@ static bool tryPatchSoulgold121()
     *(u16*)(rom + 0x11FA5A) = 0xDF9E; // copied ARM routine returned
     *(u16*)(rom + 0x1A70C2) = 0xDF9F; // main-loop callback load after read
     *(u16*)(rom + 0x1A710A) = 0xDF9F; // alternate main-loop path
-    // Share trace opcode with the callback counter. Dispatch by the
-    // exception return address. Reproduce the first Thumb BL half;
-    // the original second half remains intact.
-    *(u16*)(rom + 0x14C92E) = 0xDF9F;
-    *(u16*)(rom + 0x14C932) = 0xDF9F;
-    *(u16*)(rom + 0x14C936) = 0xDF9F;
-    *(u16*)(rom + 0x14C93A) = 0xDF9F;
-    *(u16*)(rom + 0x14C940) = 0xDF9F; // final BX r0
+    // Leave the original callback BL pairs intact. Trace the active task
+    // identified on hardware, with guarded literal loads and state read.
+    *(u16*)(rom + 0x14C952) = 0xDF9F;
+    *(u16*)(rom + 0x14C95C) = 0xDF9F;
+    *(u16*)(rom + 0x14C9CA) = 0xDF9F;
+    *(u16*)(rom + 0x14C9D6) = 0xDF9F;
+    *(u16*)(rom + 0x14C9F0) = 0xDF9F;
+    *(u16*)(rom + 0x14CA18) = 0xDF9F;
+    *(u16*)(rom + 0x14CA22) = 0xDF9F;
+    *(u16*)(rom + 0x14CA2A) = 0xDF9F;
+    *(u16*)(rom + 0x14CA3E) = 0xDF9F;
+    *(u16*)(rom + 0x14CA44) = 0xDF9F;
+    *(u16*)(rom + 0x14CA64) = 0xDF9F;
 
     // The native setup table continues to point into the ROM, but the
     // actual Flash operations dispatch through GBARunner3's save hooks.
