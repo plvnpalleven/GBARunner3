@@ -89,8 +89,13 @@ old_mode_4:
 hicodeLoadFromCache:
     sub r13, lr, #2
     bic r13, r13, #0xFE000000
+    bic r13, r13, #3 // debug index selects a 32-bit cache word
     mcr p15, 3, r13, c15, c0, 0 // set index
     mrc p15, 3, r13, c15, c3, 0 // read data
+    // SWI immediate byte is at LR-2, not necessarily word aligned.
+    // LR bit 1 clear means (LR-2) selects the upper halfword.
+    tst lr, #2
+    moveq r13, r13, lsr #16
     and r13, r13, #0xFF
     b hicodeContinue
 #endif
