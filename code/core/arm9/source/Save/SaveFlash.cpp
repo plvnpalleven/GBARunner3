@@ -452,12 +452,15 @@ static bool tryPatchSoulgold121()
     sav_swiTable[1] = (void*)readFlash;
     sav_swiTable[2] = (void*)verifyFlashSector;
     sav_swiTable[3] = (void*)verifyFlash;
-    // CONTROL: patch ONLY IdentifyFlash in SoulGold v1.2.1.
-    // Leave ReadFlash and both VerifyFlash entrypoints untouched to isolate
-    // whether one of the three auxiliary hooks causes the boot freeze.
-    *(u16*)(rom + 0x61B0) = SAVE_THUMB_SWI(0);
-    sSoulgoldRuntimeProbeEnabled = true;
-    GFX_PLTT_BG_SUB[0] = 0x001F; // red: patch installed but not yet invoked
+    // DIAGNOSTIC ONLY: bypass the SWI handler completely.
+    // 0x2000 = movs r0, #0; 0x4770 = bx lr (Thumb).
+    // This reports Flash identification success without setting up any
+    // Flash chip function pointers. Do NOT use for real gameplay/saves.
+    // Other read/verify entrypoints remain untouched.
+    *(u16*)(rom + 0x61B0) = 0x2000;
+    *(u16*)(rom + 0x61B2) = 0x4770;
+    sSoulgoldRuntimeProbeEnabled = false;
+    GFX_PLTT_BG_SUB[0] = 0x7C00; // blue: direct-return test applied
     return true;
 }
 
