@@ -313,6 +313,23 @@ soulGoldTraceResourceReturn:
     beq sgFaultCall3
     cmp r13, #0x3C
     beq sgFaultCall4
+    cmp r13, #0x70
+    beq sgPaletteEntry
+    cmp r13, #0x42
+    beq sgPaletteCallbackExit
+    // 0x0C is also used by the alternate main-loop hook.
+    cmp r13, #0x0C
+    bne 8f
+    str r0, sgTraceSavedR0
+    ldr r0, =0x023C560C
+    cmp lr, r0
+    ldreq r0, sgTraceSavedR0
+    beq sgPaletteExit
+    ldr r0, =0x081C560C
+    cmp lr, r0
+    ldr r0, sgTraceSavedR0
+    beq sgPaletteExit
+8:
     // Original 0x6863: LDR r3,[r4,#4]. Record only after guest epilogue.
     ldr r3, [r4, #4]
     str r0, sgTraceSavedR0
@@ -326,6 +343,7 @@ soulGoldTraceResourceReturn:
     str r0, sgTraceHexSavedR0
     mov r0, #0
     str r0, sgFaultCallStage
+    str r0, sgFaultReturnTarget
     ldr r0, sgTraceHexSavedR0
     str r0, sgTraceHexSavedR0
     str r12, sgTraceHexSavedR12
@@ -369,6 +387,42 @@ sgFaultCall3:
     sg_fault_prefix 3, 0x102000
 sgFaultCall4:
     sg_fault_prefix 4, 0x078000
+
+// At entry the two pushes total 32 bytes; original LR at SP+28.
+// At epilogue locals and high regs are popped, original LR at SP+16.
+.macro sg_palette_snapshot stage, offset
+    str r0, sgTraceSavedR0
+    ldr r13, =sgFaultGuestSp
+    stmia r13, {sp}^
+    nop
+    ldr r13, sgFaultGuestSp
+    ldr r0, [r13, #\offset]
+    str r0, sgFaultReturnTarget
+    mov r0, #\stage
+    str r0, sgFaultCallStage
+    ldr r0, sgTraceSavedR0
+.endm
+sgPaletteEntry:
+    sg_palette_snapshot 5, 28
+    ldr r4, =0x02038318
+    movs pc, lr
+sgPaletteExit:
+    sg_palette_snapshot 6, 16
+    mov r8, r5
+    movs pc, lr
+sgPaletteCallbackExit:
+    str r0, sgFaultReturnTarget
+    mov r13, #7
+    str r13, sgFaultCallStage
+    mov lr, r0
+    mrs r13, spsr
+    bic r13, r13, #0x20
+    tst lr, #1
+    orrne r13, r13, #0x20
+    msr spsr_c, r13
+    bic lr, lr, #1
+    biceq lr, lr, #2
+    movs pc, lr
 
 // IRQ-mode sampler: use only caller-saved r0-r3/r12, never banked SP.
 // Starts after the first post-save callback. A sampled address is not
@@ -418,14 +472,18 @@ sgTraceInvalidFetch:
     sg_hex 0x062042C4 // user SP
     ldr r0, sgTraceFaultRegs+4
     sg_hex 0x062042DC // user LR
-    mrs r0, spsr
-    sg_hex 0x0620455C // interrupted CPU status
+    ldr r0, sgFaultReturnTarget
+    sg_hex 0x0620455C // last recorded saved return target
     ldr r0, sgFaultCallStage
     sg_hex 0x06204044 // last callback call stage, replaces save caller
 1:
     b 1b
 
 .balign 4
+sgFaultGuestSp:
+    .word 0
+sgFaultReturnTarget:
+    .word 0
 sgFaultCallStage:
     .word 0
 sgFaultGuestLink:
