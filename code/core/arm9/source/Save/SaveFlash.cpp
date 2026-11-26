@@ -8,7 +8,6 @@
 #include "SaveFlashDefinitions.h"
 #include "SaveTypeInfo.h"
 #include "MemoryEmulator/RomDefs.h"
-#include "SdCache/SdCache.h"
 #include "SaveFlash.h"
 
 #define MAKER_ID_MACRONIX           0xC2
@@ -478,18 +477,6 @@ static bool tryPatchSoulgold121()
         *(u16*)(rom + 0x1A3D44) != 0x2800 ||
         *(u16*)(rom + 0x1A3D58) != 0xE7F8 ||
         *(u32*)(rom + 0x1A3D5C) != 0x030040BC ||
-        // Exact post-read callback observed on hardware (0x0814C92D).
-        *(u16*)(rom + 0x14C92C) != 0xB500 ||
-        *(u16*)(rom + 0x14C92E) != 0xF115 ||
-        *(u16*)(rom + 0x14C930) != 0xFC77 ||
-        *(u16*)(rom + 0x14C932) != 0xF100 ||
-        *(u16*)(rom + 0x14C934) != 0xFBF1 ||
-        *(u16*)(rom + 0x14C936) != 0xF102 ||
-        *(u16*)(rom + 0x14C938) != 0xF967 ||
-        *(u16*)(rom + 0x14C93A) != 0xF078 ||
-        *(u16*)(rom + 0x14C93C) != 0xFE13 ||
-        *(u16*)(rom + 0x14C93E) != 0xBC01 ||
-        *(u16*)(rom + 0x14C940) != 0x4700 ||
         *(u16*)(rom + 0x1A70C2) != 0x6863 ||
         *(u16*)(rom + 0x1A710A) != 0x6863 ||
         *(u16*)(rom + 0x11F8A4) != 0x4650 ||
@@ -510,25 +497,6 @@ static bool tryPatchSoulgold121()
         return false;
     }
 
-    // The first post-read function is a task scheduler in high ROM.
-    // Pin its 4 KiB block through the normal ROM patch-cache API.
-    // All offsets below are within that same block. Verify before writing.
-    u8* const taskCode = (u8*)sdc_loadRomBlockForPatching(0x08262220);
-    if (*(u16*)(taskCode + 0x04) != 0x4B0D ||
-        *(u16*)(taskCode + 0x28) != 0x592B ||
-        *(u16*)(taskCode + 0x30) != 0x79A0 ||
-        *(u16*)(taskCode + 0x3A) != 0x4700 ||
-        *(u32*)(taskCode + 0x3C) != 0x03005B50 ||
-        *(u32*)(taskCode + 0x40) != 0x03005B4C ||
-        *(u16*)(taskCode + 0x168) != 0x4718)
-    {
-        return false;
-    }
-    *(u16*)(taskCode + 0x04) = 0xDF9F; // scheduler entry
-    *(u16*)(taskCode + 0x28) = 0xDF9F; // load task function pointer
-    *(u16*)(taskCode + 0x30) = 0xDF9F; // task returned
-    *(u16*)(taskCode + 0x3A) = 0xDF9F; // scheduler exit
-
     // Trace SWIs execute in privileged mode and faithfully replace the
     // guarded Thumb instructions (see SaveSwi.s). Earlier lights persist.
     *(u16*)(rom + 0x5CB4) = 0xDF95; // return chip ID, mark slot 2
@@ -544,12 +512,6 @@ static bool tryPatchSoulgold121()
     *(u16*)(rom + 0x11FA5A) = 0xDF9E; // copied ARM routine returned
     *(u16*)(rom + 0x1A70C2) = 0xDF9F; // main-loop callback load after read
     *(u16*)(rom + 0x1A710A) = 0xDF9F; // alternate main-loop path
-    // Trace the remaining callback calls after the observed task returns.
-    // Original BL prefixes and suffixes are guarded above.
-    *(u16*)(rom + 0x14C932) = 0xDF9F;
-    *(u16*)(rom + 0x14C936) = 0xDF9F;
-    *(u16*)(rom + 0x14C93A) = 0xDF9F;
-    *(u16*)(rom + 0x14C940) = 0xDF9F;
 
     // The native setup table continues to point into the ROM, but the
     // actual Flash operations dispatch through GBARunner3's save hooks.
