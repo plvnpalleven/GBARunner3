@@ -518,7 +518,10 @@ static bool tryPatchSoulgold121()
     sav_swiTable[1] = (void*)readFlash;
     sav_swiTable[2] = (void*)verifyFlashSector;
     sav_swiTable[3] = (void*)verifyFlash;
-    *(u16*)(rom + 0x5F04) = 0xDF99; // trace ReadFlash, then normal SWI 1
+    // The guarded readSig also verifies the second Thumb halfword.
+    // Dedicated privileged buffered read returns to BX LR, then to caller.
+    *(u16*)(rom + 0x5F04) = 0xDF99;
+    *(u16*)(rom + 0x5F06) = 0x4770;
     *(u16*)(rom + 0x5FD8) = SAVE_THUMB_SWI(2);
     *(u16*)(rom + 0x607C) = SAVE_THUMB_SWI(3);
     *(u16*)(rom + 0x64A4) = SAVE_THUMB_SWI(8);

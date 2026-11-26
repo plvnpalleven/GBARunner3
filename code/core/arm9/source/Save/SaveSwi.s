@@ -175,9 +175,17 @@ soulGoldTraceTimer:
     movs pc, lr
 
 soulGoldTraceRead:
-    sg_trace_mark 6, 0x7C00
-    mov r13, #0x81 // proceed with original readFlash SWI dispatch
-    b sav_swiHandler
+    sg_trace_mark 6, 0x7C00 // blue: entered save read
+    // Same privileged call/return convention as sav_swiReadSaveByteFromFile.
+    // The next guest instruction is BX LR, so no old prologue executes.
+    msr cpsr_c, #0x9F
+    push {lr}
+    adr lr, soulGoldReadReturn
+    b sav_readSoulgoldFlashBlock
+soulGoldReadReturn:
+    pop {lr}
+    msr cpsr_c, #0x93
+    movs pc, lr
 
 // Trace the later resource calls while preserving original literal loads.
 soulGoldTraceResourceOne:

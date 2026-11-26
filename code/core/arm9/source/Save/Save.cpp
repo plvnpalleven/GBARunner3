@@ -172,6 +172,66 @@ void sav_initializeSave(const SaveTypeInfo* saveTypeInfo, const char* savePath)
     ipc_recvWordDirect();
 }
 
+// SoulGold diagnostic: read flash in blocks rather than one SWI per byte.
+// Separate buffer in host EWRAM avoids direct SD DMA into guest IWRAM.
+[[gnu::section(".ewram.bss"), gnu::aligned(32)]]
+static u8 sSoulgoldReadBuffer[512];
+
+extern "C" void sav_readSoulgoldFlashBlock(u32 secNo, u32 offset, u8* dst, u32 size)
+{
+    volatile u16* const marker = (volatile u16*)0x0500040C;
+    const u32 address = (u32)dst;
+    const bool ewram = address >= 0x02000000 && address < 0x02040000
+        && size <= 0x02040000 - address;
+    const bool iwram = (address >> 24) == 3
+        && size <= 0x8000 - (address & 0x7FFF);
+    const u32 flashSize = 128 * 1024;
+    if (!(ewram || iwram) || (secNo & 0xFFFF) >= 32 ||
+        offset > flashSize - ((secNo & 0xFFFF) << 12))
+    {
+        *marker = 0x7C1F; // magenta: unexpected arguments
+        return;
+    }
+    const u32 start = ((secNo & 0xFFFF) << 12) + offset;
+    if (size > flashSize - start)
+    {
+        *marker = 0x7C1F;
+        return;
+    }
+    *marker = 0x03FF; // yellow: starting read
+    vm_enableNestedIrqs();
+    bool ok = true;
+    if (Environment::IsIsNitroEmulator())
+    {
+        for (u32 i = 0; i < size; ++i)
+            dst[i] = ISNITRO_SAVE_BUFFER[start + i];
+    }
+    else
+    {
+        ok = f_lseek(&gSaveFile, start) == FR_OK;
+        u32 remaining = size;
+        while (ok && remaining)
+        {
+            const u32 chunk = remaining > sizeof(sSoulgoldReadBuffer)
+                ? sizeof(sSoulgoldReadBuffer) : remaining;
+            UINT got = 0;
+            ok = f_read(&gSaveFile, sSoulgoldReadBuffer, chunk, &got) == FR_OK
+                && got == chunk;
+            if (ok)
+            {
+                memcpy(dst, sSoulgoldReadBuffer, chunk);
+                dst += chunk;
+                remaining -= chunk;
+            }
+        }
+        // Do not expose uninitialized data on a failed or short read.
+        if (!ok)
+            memset(dst, SAVE_DATA_FILL, remaining);
+    }
+    vm_disableNestedIrqs();
+    *marker = ok ? 0x03E0 : 0x001F; // green: complete, red: I/O error
+}
+
 extern "C" u8 sav_readSaveByteFromFile(u32 saveAddress)
 {
     vm_enableNestedIrqs();
