@@ -553,6 +553,19 @@ sgVerifyMixerCopy:
     add r2, r2, #4
     cmp r2, r3
     blo 1b
+    // Experiment 053: keep SoundMain's original sequencing callbacks
+    // and skip only its RAM sample-mixing body. Verified original
+    // epilogue at ROM 0829031E maps to Thumb 03001AEA:
+    // load magic; restore lock, saved registers, stack and return.
+    // r0 still contains SoundInfo when the original wrapper enters here.
+    ldr r2, =0x030011D8
+    ldr r0, =0x47184B00 // Thumb LDR r3,[pc,#0]; BX r3
+    str r0, [r2]
+    ldr r0, =0x03001AEB
+    str r0, [r2, #4]
+    ldr r13, sgFaultCallStage
+    add r13, r13, #2 // 3: matched and bypassed; 4: repaired and bypassed
+    str r13, sgFaultCallStage
     ldr r2, =0x030011C0
     ldr r3, =0x03001D20
 2:
@@ -569,7 +582,7 @@ sgVerifyMixerCopy:
     cmp r2, r3
     blo 3b
     ldr r0, sgFaultCallStage
-    orr r0, r0, #0x52000000
+    orr r0, r0, #0x53000000
     sg_hex 0x06204044
     ldr r1, sgMixerSavedR1
     ldr r2, sgMixerSavedR2
@@ -607,8 +620,8 @@ sgTraceInvalidFetch:
     orr r0, r0, r13, lsl #8
     ldr r13, sgFaultCallStage
     orr r0, r0, r13
-    orr r0, r0, #0x52000000
-    sg_hex 0x06204044 // 52 BB CC SS: build ID, BIOS phase, VM CPSR, copy status
+    orr r0, r0, #0x53000000
+    sg_hex 0x06204044 // 53 BB CC SS: build ID, BIOS phase, VM CPSR, copy status
 1:
     b 1b
 
