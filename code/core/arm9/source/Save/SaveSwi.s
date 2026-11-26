@@ -305,24 +305,30 @@ soulGoldTraceSecondReturn:
 
 soulGoldTraceResourceReturn:
     and r13, lr, #0xFF
-    cmp r13, #0x42
-    beq sgPaletteCallbackExit
-    cmp r13, #0x16
-    beq sgPostReturn
-    cmp r13, #0x9a
-    beq sgPostCheckCall
     cmp r13, #0x9e
-    beq sgPostCheckReturn
+    beq sgCheckResult
+    cmp r13, #0xa4
+    beq sgTransitionYes
+    cmp r13, #0xa8
+    beq sgResetCall
     cmp r13, #0xac
-    beq sgPostExtraReturn
-    cmp r13, #0xe
-    beq sgPostLoop
-    cmp r13, #0x8e
-    beq sgPostAlternate
-    cmp r13, #0xba
-    beq sgPostCallbackOne
-    cmp r13, #0xce
-    beq sgPostOtherReturn
+    beq sgResetReturn
+    cmp r13, #0xb2
+    beq sgCheckAgain
+    cmp r13, #0xb6
+    beq sgCheckAgainReturn
+    cmp r13, #0x70
+    beq sgFrameCall1
+    cmp r13, #0x74
+    beq sgFrameCall2
+    cmp r13, #0x78
+    beq sgFrameCallsDone
+    cmp r13, #0x7e
+    beq sgFrameWait
+    cmp r13, #0xe8
+    beq sgWaitCall
+    cmp r13, #0xec
+    beq sgWaitReturn
     // Original 0x6863: LDR r3,[r4,#4]. Record only after guest epilogue.
     ldr r3, [r4, #4]
     str r0, sgTraceSavedR0
@@ -357,74 +363,81 @@ soulGoldTraceResourceReturn:
 1:
     movs pc, lr
 
-// Record stage with no guest register or flag changes.
+// Banked r13 is scratch; preserve guest flags via SPSR.
 .macro sg_post_stage stage
     mov r13, #\stage
     str r13, sgFaultCallStage
 .endm
-sgPostReturn:
-    sg_post_stage 8
-    // Original Thumb B at 1A7114 targets 1A7098.
-    sub lr, lr, #0x7E
-    movs pc, lr
-sgPostCheckCall:
-    sg_post_stage 9
-    // Original Thumb BL prefix F01B; suffix FE1C remains native.
+// Recreate ARMv4T BL prefix, leaving the original suffix untouched.
+.macro sg_transition_prefix stage, magnitude, negative=0
+    sg_post_stage \stage
     str r0, sgTraceSavedR0
     add r0, lr, #2
-    add r0, r0, #0x1B000
+    ldr r13, =\magnitude
+    .if \negative
+    sub r0, r0, r13
+    .else
+    add r0, r0, r13
+    .endif
     str r0, sgFaultGuestLink
     ldr r13, =sgFaultGuestLink
     ldmia r13, {lr}^
     nop
     ldr r0, sgTraceSavedR0
     movs pc, lr
-sgPostCheckReturn:
+.endm
+sgCheckResult:
     mov r11, r0
-    sg_post_stage 0xA
+    str r0, sgFaultReturnTarget // actual transition-check result
+    sg_post_stage 0x10
     movs pc, lr
-sgPostExtraReturn:
-    mov r3, #0x41
-    // MOVS sets N/Z, preserves C/V.
-    mrs r13, spsr
-    bic r13, r13, #0xC0000000
-    msr spsr_f, r13
-    sg_post_stage 0xB
-    movs pc, lr
-sgPostLoop:
-    mov r3, r8
-    sg_post_stage 0xC
-    movs pc, lr
-sgPostAlternate:
-    mov r2, #0
+sgTransitionYes:
+    mov r3, #0
     mrs r13, spsr
     bic r13, r13, #0x80000000
     orr r13, r13, #0x40000000
     msr spsr_f, r13
-    sg_post_stage 0xD
+    sg_post_stage 0x11
     movs pc, lr
-sgPostCallbackOne:
-    ldr r3, [r4]
-    sg_post_stage 0xE
-    movs pc, lr
-sgPostOtherReturn:
-    sg_post_stage 0xF
-    // Original B at 1A70CC targets 1A7068.
-    sub lr, lr, #0x66
-    movs pc, lr
-
-sgPaletteCallbackExit:
-    str r0, sgFaultReturnTarget
-    mov r13, #7
-    str r13, sgFaultCallStage
-    mov lr, r0
+sgResetCall:
+    sg_transition_prefix 0x12, 0xA6000
+sgResetReturn:
+    mov r3, #0x41
     mrs r13, spsr
-    bic r13, r13, #0x20
-    tst lr, #1
-    orrne r13, r13, #0x20
-    msr spsr_c, r13
-    bic lr, lr, #1
-    biceq lr, lr, #2
+    bic r13, r13, #0xC0000000
+    msr spsr_f, r13
+    sg_post_stage 0x13
+    movs pc, lr
+sgCheckAgain:
+    sg_transition_prefix 0x14, 0x9000, 1
+sgCheckAgainReturn:
+    // Original CMP r0,#0: N/Z from r0, C=1, V=0.
+    mrs r13, spsr
+    bic r13, r13, #0xF0000000
+    orr r13, r13, #0x20000000
+    cmp r0, #0
+    orreq r13, r13, #0x40000000
+    orrmi r13, r13, #0x80000000
+    msr spsr_f, r13
+    sg_post_stage 0x15
+    movs pc, lr
+sgFrameCall1:
+    sg_transition_prefix 0x16, 0x33000
+sgFrameCall2:
+    sg_transition_prefix 0x17, 0xA4000
+sgFrameCallsDone:
+    ldrh r3, [r4, #0x1C]
+    sg_post_stage 0x18
+    movs pc, lr
+sgFrameWait:
+    mov r3, r9
+    sg_post_stage 0x19
+    movs pc, lr
+sgWaitCall:
+    sg_transition_prefix 0x1A, 0x1A7000, 1
+sgWaitReturn:
+    sg_post_stage 0x1B
+    sub lr, lr, #0xE0 // 1A70EC -> 1A700C
     movs pc, lr
 
 // IRQ-mode sampler: use only caller-saved r0-r3/r12, never banked SP.
@@ -473,10 +486,11 @@ sgTraceInvalidFetch:
     nop
     ldr r0, sgTraceFaultRegs
     sg_hex 0x062042C4 // user SP
-    ldr r0, sgTraceFaultRegs+4
-    sg_hex 0x062042DC // user LR
+    ldr r13, =vm_cpsr
+    ldr r0, [r13]
+    sg_hex 0x062042DC // virtual GBA CPSR (mode and IRQ mask)
     ldr r0, sgFaultReturnTarget
-    sg_hex 0x0620455C // last recorded saved return target
+    sg_hex 0x0620455C // transition-check result
     ldr r0, sgFaultCallStage
     sg_hex 0x06204044 // last callback call stage, replaces save caller
 1:

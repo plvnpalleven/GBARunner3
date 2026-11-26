@@ -489,15 +489,23 @@ static bool tryPatchSoulgold121()
         *(u16*)(rom + 0x14C93C) != 0xFE13 ||
         *(u16*)(rom + 0x14C93E) != 0xBC01 ||
         *(u16*)(rom + 0x14C940) != 0x4700 ||
-        *(u16*)(rom + 0x1A7114) != 0xE7C0 ||
-        *(u16*)(rom + 0x1A7098) != 0xF01B ||
         *(u16*)(rom + 0x1A709C) != 0x4683 ||
+        *(u16*)(rom + 0x1A70A2) != 0x2300 ||
+        *(u16*)(rom + 0x1A70A6) != 0xF0A6 ||
         *(u16*)(rom + 0x1A70AA) != 0x2341 ||
-        *(u16*)(rom + 0x1A700C) != 0x4643 ||
-        *(u16*)(rom + 0x1A708C) != 0x2200 ||
-        *(u16*)(rom + 0x1A70B8) != 0x6823 ||
-        *(u16*)(rom + 0x1A70CC) != 0xE7CC ||
-        *(u16*)(rom + 0x1A709A) != 0xFE1C ||
+        *(u16*)(rom + 0x1A70B0) != 0xF7F7 ||
+        *(u16*)(rom + 0x1A70B4) != 0x2800 ||
+        *(u16*)(rom + 0x1A706E) != 0xF033 ||
+        *(u16*)(rom + 0x1A7072) != 0xF0A4 ||
+        *(u16*)(rom + 0x1A7076) != 0x8BA3 ||
+        *(u16*)(rom + 0x1A707C) != 0x464B ||
+        *(u16*)(rom + 0x1A70E6) != 0xF659 ||
+        *(u16*)(rom + 0x1A70EA) != 0xE78F ||
+        *(u16*)(rom + 0x1A70A8) != 0xF8C1 ||
+        *(u16*)(rom + 0x1A70B2) != 0xFA4C ||
+        *(u16*)(rom + 0x1A7070) != 0xFE65 ||
+        *(u16*)(rom + 0x1A7074) != 0xFD75 ||
+        *(u16*)(rom + 0x1A70E8) != 0xF90F ||
         *(u16*)(rom + 0x1A70C2) != 0x6863 ||
         *(u16*)(rom + 0x1A710A) != 0x6863 ||
         *(u16*)(rom + 0x11F8A4) != 0x4650 ||
@@ -534,16 +542,20 @@ static bool tryPatchSoulgold121()
     *(u16*)(rom + 0x1A70C2) = 0xDF9F; // main-loop callback load after read
     *(u16*)(rom + 0x1A710A) = 0xDF9F; // alternate main-loop path
 
-    // Keep callback exit snapshot; trace main-loop code after return.
-    *(u16*)(rom + 0x14C940) = 0xDF9F;
-    *(u16*)(rom + 0x1A7114) = 0xDF9F;
-    *(u16*)(rom + 0x1A7098) = 0xDF9F;
+    // Restore original callback return and branch instructions; observe
+    // only the post-transition decision and subsequent calls.
     *(u16*)(rom + 0x1A709C) = 0xDF9F;
+    *(u16*)(rom + 0x1A70A2) = 0xDF9F;
+    *(u16*)(rom + 0x1A70A6) = 0xDF9F;
     *(u16*)(rom + 0x1A70AA) = 0xDF9F;
-    *(u16*)(rom + 0x1A700C) = 0xDF9F;
-    *(u16*)(rom + 0x1A708C) = 0xDF9F;
-    *(u16*)(rom + 0x1A70B8) = 0xDF9F;
-    *(u16*)(rom + 0x1A70CC) = 0xDF9F;
+    *(u16*)(rom + 0x1A70B0) = 0xDF9F;
+    *(u16*)(rom + 0x1A70B4) = 0xDF9F;
+    *(u16*)(rom + 0x1A706E) = 0xDF9F;
+    *(u16*)(rom + 0x1A7072) = 0xDF9F;
+    *(u16*)(rom + 0x1A7076) = 0xDF9F;
+    *(u16*)(rom + 0x1A707C) = 0xDF9F;
+    *(u16*)(rom + 0x1A70E6) = 0xDF9F;
+    *(u16*)(rom + 0x1A70EA) = 0xDF9F;
 
     // The native setup table continues to point into the ROM, but the
     // actual Flash operations dispatch through GBARunner3's save hooks.
