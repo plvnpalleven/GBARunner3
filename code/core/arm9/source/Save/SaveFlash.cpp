@@ -499,6 +499,10 @@ static bool tryPatchSoulgold121()
         *(u16*)(rom + 0x1A7072) != 0xF0A4 ||
         *(u16*)(rom + 0x1A7076) != 0x8BA3 ||
         *(u16*)(rom + 0x1A707C) != 0x464B ||
+        // VBlankIntrWait wrapper, verified in the original v1.2.1 ROM.
+        *(u16*)(rom + 0x308) != 0x2200 ||
+        *(u16*)(rom + 0x30A) != 0xDF05 ||
+        *(u16*)(rom + 0x30C) != 0x4770 ||
         *(u16*)(rom + 0x1A70E6) != 0xF659 ||
         *(u16*)(rom + 0x1A70EA) != 0xE78F ||
         *(u16*)(rom + 0x1A70A8) != 0xF8C1 ||
@@ -556,6 +560,9 @@ static bool tryPatchSoulgold121()
     *(u16*)(rom + 0x1A707C) = 0xDF9F;
     *(u16*)(rom + 0x1A70E6) = 0xDF9F;
     *(u16*)(rom + 0x1A70EA) = 0xDF9F;
+    // Keep the actual BIOS SWI 05 intact. Snapshot caller LR on both sides.
+    *(u16*)(rom + 0x308) = 0xDF9F;
+    *(u16*)(rom + 0x30C) = 0xDF9F;
 
     // The native setup table continues to point into the ROM, but the
     // actual Flash operations dispatch through GBARunner3's save hooks.

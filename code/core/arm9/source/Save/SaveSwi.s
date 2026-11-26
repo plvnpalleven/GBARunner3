@@ -305,6 +305,10 @@ soulGoldTraceSecondReturn:
 
 soulGoldTraceResourceReturn:
     and r13, lr, #0xFF
+    cmp r13, #0x0A
+    beq sgVblankWaitEntry
+    cmp r13, #0x0E
+    beq sgVblankWaitExit
     cmp r13, #0x9e
     beq sgCheckResult
     cmp r13, #0xa4
@@ -440,6 +444,54 @@ sgWaitReturn:
     sub lr, lr, #0xE0 // 1A70EC -> 1A700C
     movs pc, lr
 
+// Record actual guest link register, not the exception return register.
+// Only record after the main loop has selected a post-save callback.
+sgVblankWaitEntry:
+    mov r2, #0
+    mrs r13, spsr
+    bic r13, r13, #0x80000000
+    orr r13, r13, #0x40000000
+    msr spsr_f, r13
+    str r0, sgTraceSavedR0
+    ldr r0, sgTraceCallbackCount
+    cmp r0, #0
+    beq 1f
+    mov r13, #0x1C
+    str r13, sgFaultCallStage
+    ldr r13, =sgWaitEntryLink
+    stmia r13, {lr}^
+    nop
+    ldr r0, sgWaitEntryLink
+    str r0, sgFaultReturnTarget
+1:
+    ldr r0, sgTraceSavedR0
+    movs pc, lr
+
+sgVblankWaitExit:
+    str r0, sgTraceSavedR0
+    ldr r13, =sgWaitExitLink
+    stmia r13, {lr}^
+    nop
+    ldr r0, sgTraceCallbackCount
+    cmp r0, #0
+    beq 1f
+    mov r13, #0x1D
+    str r13, sgFaultCallStage
+    ldr r0, sgWaitExitLink
+    str r0, sgFaultReturnTarget
+1:
+    // Execute the original BX LR from the user register bank.
+    ldr lr, sgWaitExitLink
+    ldr r0, sgTraceSavedR0
+    mrs r13, spsr
+    bic r13, r13, #0x20
+    tst lr, #1
+    orrne r13, r13, #0x20
+    msr spsr_c, r13
+    bic lr, lr, #1
+    biceq lr, lr, #2
+    movs pc, lr
+
 // IRQ-mode sampler: use only caller-saved r0-r3/r12, never banked SP.
 // Starts after the first post-save callback. A sampled address is not
 // necessarily the exact faulting PC, but shows what the IRQ interrupted.
@@ -490,13 +542,17 @@ sgTraceInvalidFetch:
     ldr r0, [r13]
     sg_hex 0x062042DC // virtual GBA CPSR (mode and IRQ mask)
     ldr r0, sgFaultReturnTarget
-    sg_hex 0x0620455C // transition-check result
+    sg_hex 0x0620455C // latest wait LR, or previous transition result
     ldr r0, sgFaultCallStage
     sg_hex 0x06204044 // last callback call stage, replaces save caller
 1:
     b 1b
 
 .balign 4
+sgWaitEntryLink:
+    .word 0
+sgWaitExitLink:
+    .word 0
 sgFaultReturnTarget:
     .word 0
 sgFaultCallStage:
