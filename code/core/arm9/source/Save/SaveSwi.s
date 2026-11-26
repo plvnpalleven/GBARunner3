@@ -5,11 +5,11 @@
 
 arm_func sav_swiHandler
     cmp r13, #0x9A
-        beq soulGoldTraceFirstCopy
+        beq soulGoldTraceResourceOne
     cmp r13, #0x9B
-        beq soulGoldTraceFirstCall
+        beq soulGoldTraceResourceTwo
     cmp r13, #0x9C
-        beq soulGoldTraceFirstReturn
+        beq soulGoldTraceGraphicsSetup
     cmp r13, #0x9D
         beq soulGoldTraceSecondCall
     cmp r13, #0x9E
@@ -179,19 +179,19 @@ soulGoldTraceRead:
     mov r13, #0x81 // proceed with original readFlash SWI dispatch
     b sav_swiHandler
 
-// Reproduce original instructions; leave cache behavior unchanged for this control.
-soulGoldTraceFirstCopy:
-    mov r2, r10
+// Trace the later resource calls while preserving original literal loads.
+soulGoldTraceResourceOne:
+    ldr r0, =0x086801C4
     sg_trace_mark 7, 0x7FE0
     movs pc, lr
 
-soulGoldTraceFirstCall:
-    str r1, [r7, #0x20]
+soulGoldTraceResourceTwo:
+    ldr r0, =0x0868054C
     sg_trace_mark 8, 0x03FF
     movs pc, lr
 
-soulGoldTraceFirstReturn:
-    mov r3, r10
+soulGoldTraceGraphicsSetup:
+    ldr r3, =0x0000FFFF
     sg_trace_mark 9, 0x03E0
     movs pc, lr
 
@@ -239,7 +239,7 @@ soulGoldTraceSecondReturn:
     movs pc, lr
 
 soulGoldTraceResourceReturn:
-    ldr r0, =0x086801C4
+    ldr r4, =0x03002F78
     sg_trace_mark 12, 0x7C00
     movs pc, lr
 

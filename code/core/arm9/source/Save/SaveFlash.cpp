@@ -477,9 +477,12 @@ static bool tryPatchSoulgold121()
         *(u16*)(rom + 0x1A3D44) != 0x2800 ||
         *(u16*)(rom + 0x1A3D58) != 0xE7F8 ||
         *(u32*)(rom + 0x1A3D5C) != 0x030040BC ||
-        *(u16*)(rom + 0x11FADA) != 0x4652 ||
-        *(u16*)(rom + 0x11FAEC) != 0x6239 ||
-        *(u16*)(rom + 0x11FAF2) != 0x4653 ||
+        *(u16*)(rom + 0x18B618) != 0x4837 ||
+        *(u32*)(rom + 0x18B6F8) != 0x0868054C ||
+        *(u16*)(rom + 0x18B630) != 0x4B32 ||
+        *(u32*)(rom + 0x18B6FC) != 0x0000FFFF ||
+        *(u16*)(rom + 0x18B666) != 0x4C1B ||
+        *(u32*)(rom + 0x18B6D4) != 0x03002F78 ||
         *(u16*)(rom + 0x11FA52) != 0x6BB9 ||
         *(u16*)(rom + 0x11FA5A) != 0x6BF8 ||
         *(u16*)(rom + 0x18B60C) != 0x4838 ||
@@ -497,13 +500,13 @@ static bool tryPatchSoulgold121()
     *(u16*)(rom + 0x620E) = 0xDF96; // str r3,[r2], mark slot 3
     *(u16*)(rom + 0x1A3D42) = 0xDF97; // ldr r3,[pc,#24], mark slot 4
     *(u16*)(rom + 0x1A3D58) = 0xDF98; // branch after InitFlashTimer, slot 5
-    // Trace the two indirect ARM calls to code copied onto the guest stack.
-    *(u16*)(rom + 0x11FADA) = 0xDF9A; // first stack code copy completed
-    *(u16*)(rom + 0x11FAEC) = 0xDF9B; // immediately before first copied ARM routine
-    *(u16*)(rom + 0x11FAF2) = 0xDF9C; // first copied ARM routine returned
-    *(u16*)(rom + 0x11FA52) = 0xDF9D; // immediately before second copied ARM routine
-    *(u16*)(rom + 0x11FA5A) = 0xDF9E; // second copied ARM routine returned and stack restored
-    *(u16*)(rom + 0x18B60C) = 0xDF9F; // first graphics resource completed
+    // Keep the proven cache-sync hook, trace subsequent graphics operations.
+    *(u16*)(rom + 0x18B60C) = 0xDF9A; // first resource returned
+    *(u16*)(rom + 0x18B618) = 0xDF9B; // second resource returned
+    *(u16*)(rom + 0x18B630) = 0xDF9C; // third resource and four setup calls returned
+    *(u16*)(rom + 0x11FA52) = 0xDF9D; // cache synchronization before copied ARM call
+    *(u16*)(rom + 0x11FA5A) = 0xDF9E; // copied ARM routine returned
+    *(u16*)(rom + 0x18B666) = 0xDF9F; // later screen setup reached
 
     // The native setup table continues to point into the ROM, but the
     // actual Flash operations dispatch through GBARunner3's save hooks.
