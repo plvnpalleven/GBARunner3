@@ -333,7 +333,40 @@ soulGoldTraceResourceReturn:
 1:
     movs pc, lr
 
+// IRQ-mode sampler: use only caller-saved r0-r3/r12, never banked SP.
+// Starts after the first post-save callback. A sampled address is not
+// necessarily the exact faulting PC, but shows what the IRQ interrupted.
+.global sgTraceVblankSample
+sgTraceVblankSample:
+    ldr r1, sgTraceCallbackCount
+    cmp r1, #0
+    bxeq lr
+    ldr r1, =0x0620405C
+    mov r3, #8
+1:
+    mov r2, r0, lsr #28
+    add r2, r2, #16
+    strh r2, [r1], #2
+    mov r0, r0, lsl #4
+    subs r3, r3, #1
+    bne 1b
+    ldr r0, sgTraceVblankCount
+    add r0, r0, #1
+    str r0, sgTraceVblankCount
+    ldr r1, =0x0620455C
+    mov r3, #8
+2:
+    mov r2, r0, lsr #28
+    add r2, r2, #16
+    strh r2, [r1], #2
+    mov r0, r0, lsl #4
+    subs r3, r3, #1
+    bne 2b
+    bx lr
+
 .balign 4
+sgTraceVblankCount:
+    .word 0
 sgTraceSavedR0:
     .word 0
 sgTraceHexSavedR0:
