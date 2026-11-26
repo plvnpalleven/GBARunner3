@@ -490,17 +490,6 @@ static bool tryPatchSoulgold121()
         *(u16*)(rom + 0x14C93C) != 0xFE13 ||
         *(u16*)(rom + 0x14C93E) != 0xBC01 ||
         *(u16*)(rom + 0x14C940) != 0x4700 ||
-        *(u16*)(rom + 0x14CA44) != 0x4C47 ||
-        *(u16*)(rom + 0x11FF1A) != 0x0005 ||
-        *(u16*)(rom + 0x11FF22) != 0x686B ||
-        *(u16*)(rom + 0x11FF30) != 0x0005 ||
-        *(u16*)(rom + 0x11FF38) != 0x0028 ||
-        *(u16*)(rom + 0x14CA4C) != 0x0020 ||
-        *(u16*)(rom + 0x14CA54) != 0x0020 ||
-        *(u16*)(rom + 0x14CA5C) != 0x0020 ||
-        *(u16*)(rom + 0x14CA64) != 0x4940 ||
-        *(u32*)(rom + 0x14CB64) != 0x085B6CDC ||
-        *(u32*)(rom + 0x14CB68) != 0x02038334 ||
         *(u16*)(rom + 0x1A70C2) != 0x6863 ||
         *(u16*)(rom + 0x1A710A) != 0x6863 ||
         *(u16*)(rom + 0x11F8A4) != 0x4650 ||
@@ -555,16 +544,12 @@ static bool tryPatchSoulgold121()
     *(u16*)(rom + 0x11FA5A) = 0xDF9E; // copied ARM routine returned
     *(u16*)(rom + 0x1A70C2) = 0xDF9F; // main-loop callback load after read
     *(u16*)(rom + 0x1A710A) = 0xDF9F; // alternate main-loop path
-    // Trace compressed sprite sheets and palette loads.
-    *(u16*)(rom + 0x14CA44) = 0xDF9F;
-    *(u16*)(rom + 0x11FF1A) = 0xDF9F;
-    *(u16*)(rom + 0x11FF22) = 0xDF9F;
-    *(u16*)(rom + 0x11FF30) = 0xDF9F;
-    *(u16*)(rom + 0x11FF38) = 0xDF9F;
-    *(u16*)(rom + 0x14CA4C) = 0xDF9F;
-    *(u16*)(rom + 0x14CA54) = 0xDF9F;
-    *(u16*)(rom + 0x14CA5C) = 0xDF9F;
-    *(u16*)(rom + 0x14CA64) = 0xDF9F;
+    // Trace the remaining callback calls after the observed task returns.
+    // Original BL prefixes and suffixes are guarded above.
+    *(u16*)(rom + 0x14C932) = 0xDF9F;
+    *(u16*)(rom + 0x14C936) = 0xDF9F;
+    *(u16*)(rom + 0x14C93A) = 0xDF9F;
+    *(u16*)(rom + 0x14C940) = 0xDF9F;
 
     // The native setup table continues to point into the ROM, but the
     // actual Flash operations dispatch through GBARunner3's save hooks.

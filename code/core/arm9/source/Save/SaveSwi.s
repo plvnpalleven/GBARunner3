@@ -318,24 +318,14 @@ soulGoldTraceResourceReturn:
     beq sgTaskReturn
     cmp r13, #0x5C
     beq sgTaskExit
-    cmp r13, #0x46
-    beq sgTitleTask0
-    cmp r13, #0x1C
-    beq sgTitleTask1
-    cmp r13, #0x24
-    beq sgTitleTask2
-    cmp r13, #0x32
-    beq sgTitleTask3
-    cmp r13, #0x3A
-    beq sgTitleTask4
-    cmp r13, #0x4E
-    beq sgTitleTask5
-    cmp r13, #0x56
-    beq sgTitleTask6
-    cmp r13, #0x5E
-    beq sgTitleTask7
-    cmp r13, #0x66
-    beq sgTitleTask8
+    cmp r13, #0x34
+    beq sgStepCall2
+    cmp r13, #0x38
+    beq sgStepCall3
+    cmp r13, #0x3C
+    beq sgStepCall4
+    cmp r13, #0x42
+    beq sgStepCallbackExit
     // Original 0x6863: LDR r3,[r4,#4]. Record only after guest epilogue.
     ldr r3, [r4, #4]
     str r0, sgTraceSavedR0
@@ -365,96 +355,63 @@ soulGoldTraceResourceReturn:
 1:
     movs pc, lr
 
-// Restore the exact replaced instruction, including MOVS N/Z flags.
-sgTitleTask0:
-    ldr r4, =0x085B6CDC
-    mov r13, #0x37
-    b sgTitleStage
+// Manual stepping begins only after the observed task 0814C8F5 returns.
+// Poll physical DS R shoulder button (active low), requiring a new press
+// and release. SWI mode masks IRQs; no guest state is changed by the wait.
+.macro sg_step_if_armed
+    str r0, sgStepSavedR0
+    ldr r0, sgStepArmed
+    cmp r0, #1
+    ldr r0, sgStepSavedR0
+    bne .Lsg_step_done\@
+    str lr, sgStepSavedLR
+    bl sgWaitForR
+    ldr lr, sgStepSavedLR
+.Lsg_step_done\@:
+.endm
 
-sgTitleTask1:
-    mov r5, r0
-    mrs r13, spsr
-    bic r13, r13, #0xC0000000
-    cmp r5, #0
-    orreq r13, r13, #0x40000000
-    orrmi r13, r13, #0x80000000
-    msr spsr_f, r13
-    mov r13, #0x40
-    b sgTitleStage
+sgWaitForR:
+    str r0, sgStepSavedR0
+    ldr r13, =0x04000130
+1:
+    ldrh r0, [r13]
+    tst r0, #0x100
+    beq 1b
+2:
+    ldrh r0, [r13]
+    tst r0, #0x100
+    bne 2b
+3:
+    ldrh r0, [r13]
+    tst r0, #0x100
+    beq 3b
+    ldr r0, sgStepSavedR0
+    bx lr
 
-sgTitleTask2:
-    ldr r3, [r5, #4]
-    mov r13, #0x41
-    b sgTitleStage
-
-sgTitleTask3:
-    mov r5, r0
-    mrs r13, spsr
-    bic r13, r13, #0xC0000000
-    cmp r5, #0
-    orreq r13, r13, #0x40000000
-    orrmi r13, r13, #0x80000000
-    msr spsr_f, r13
-    mov r13, #0x42
-    b sgTitleStage
-
-sgTitleTask4:
-    mov r0, r5
-    mrs r13, spsr
-    bic r13, r13, #0xC0000000
-    cmp r0, #0
-    orreq r13, r13, #0x40000000
-    orrmi r13, r13, #0x80000000
-    msr spsr_f, r13
-    mov r13, #0x43
-    b sgTitleStage
-
-sgTitleTask5:
-    mov r0, r4
-    mrs r13, spsr
-    bic r13, r13, #0xC0000000
-    cmp r0, #0
-    orreq r13, r13, #0x40000000
-    orrmi r13, r13, #0x80000000
-    msr spsr_f, r13
-    mov r13, #0x44
-    b sgTitleStage
-
-sgTitleTask6:
-    mov r0, r4
-    mrs r13, spsr
-    bic r13, r13, #0xC0000000
-    cmp r0, #0
-    orreq r13, r13, #0x40000000
-    orrmi r13, r13, #0x80000000
-    msr spsr_f, r13
-    mov r13, #0x45
-    b sgTitleStage
-
-sgTitleTask7:
-    mov r0, r4
-    mrs r13, spsr
-    bic r13, r13, #0xC0000000
-    cmp r0, #0
-    orreq r13, r13, #0x40000000
-    orrmi r13, r13, #0x80000000
-    msr spsr_f, r13
-    mov r13, #0x46
-    b sgTitleStage
-
-sgTitleTask8:
-    ldr r1, =0x02038334
-    mov r13, #0x38
-    b sgTitleStage
-
-sgTitleStage:
+.macro sg_step_prefix stage, offset
     str r0, sgTraceHexSavedR0
     str r12, sgTraceHexSavedR12
-    mov r0, r13
+    mov r0, #\stage
     sg_hex 0x0620455C
+    ldr r13, =\offset
+    add r0, lr, #2
+    add r0, r0, r13
+    str r0, sgStepGuestLink
+    ldr r13, =sgStepGuestLink
+    ldmia r13, {lr}^
+    nop
     ldr r12, sgTraceHexSavedR12
     ldr r0, sgTraceHexSavedR0
+    sg_step_if_armed
     movs pc, lr
+.endm
+
+sgStepCall2:
+    sg_step_prefix 0x15, 0x100000
+sgStepCall3:
+    sg_step_prefix 0x16, 0x102000
+sgStepCall4:
+    sg_step_prefix 0x17, 0x078000
 
 // Retain bottom-left loop counter, put scheduler stage bottom-right.
 // The active task function pointer is written top-right.
@@ -475,6 +432,7 @@ sgTaskEntry:
 sgTaskDispatch:
     // Original LDR r3,[r5,r4].
     ldr r3, [r5, r4]
+    str r3, sgStepLastTask
     sg_task_stage 0x12
     str r0, sgTraceHexSavedR0
     str r12, sgTraceHexSavedR12
@@ -487,11 +445,34 @@ sgTaskDispatch:
 sgTaskReturn:
     ldrb r0, [r4, #6]
     sg_task_stage 0x13
+    str r0, sgStepSavedR0
+    ldr r0, sgStepArmed
+    cmp r0, #0
+    bne 1f
+    ldr r0, sgStepLastTask
+    ldr r13, =0x0814C8F5
+    cmp r0, r13
+    moveq r0, #1
+    streq r0, sgStepArmed
+1:
+    ldr r0, sgStepSavedR0
+    sg_step_if_armed
     movs pc, lr
 
 sgTaskExit:
     sg_task_stage 0x14
+    sg_step_if_armed
     b sgTraceBxR0
+
+sgStepCallbackExit:
+    sg_task_stage 0x18
+    sg_step_if_armed
+    str r0, sgStepSavedR0
+    ldr r0, sgStepArmed
+    cmp r0, #1
+    moveq r0, #2
+    streq r0, sgStepArmed
+    ldr r0, sgStepSavedR0
 
 sgTraceBxR0:
     // Emulate BX r0, including ARM/Thumb state.
@@ -506,6 +487,16 @@ sgTraceBxR0:
     movs pc, lr
 
 .balign 4
+sgStepArmed:
+    .word 0
+sgStepLastTask:
+    .word 0
+sgStepSavedR0:
+    .word 0
+sgStepSavedLR:
+    .word 0
+sgStepGuestLink:
+    .word 0
 sgTraceSavedR0:
     .word 0
 sgTraceHexSavedR0:
