@@ -5,17 +5,17 @@
 
 arm_func sav_swiHandler
     cmp r13, #0x9A
-        beq soulGoldTraceHeaderStart
+        beq soulGoldTraceFirstCopy
     cmp r13, #0x9B
-        beq soulGoldTraceHeaderRead
+        beq soulGoldTraceFirstCall
     cmp r13, #0x9C
-        beq soulGoldTraceDecoder
+        beq soulGoldTraceFirstReturn
     cmp r13, #0x9D
-        beq soulGoldTraceLookup
+        beq soulGoldTraceSecondCall
     cmp r13, #0x9E
-        beq soulGoldTraceLookupReturn
+        beq soulGoldTraceSecondReturn
     cmp r13, #0x9F
-        beq soulGoldTraceCopyReturn
+        beq soulGoldTraceResourceReturn
     cmp r13, #0x95
         beq soulGoldTraceId
     cmp r13, #0x96
@@ -179,49 +179,34 @@ soulGoldTraceRead:
     mov r13, #0x81 // proceed with original readFlash SWI dispatch
     b sav_swiHandler
 
-// Reproduce the replaced instructions without changing guest CPSR flags.
-soulGoldTraceHeaderStart:
-    ldr r2, =0x04000002
+// Reproduce original instructions; leave cache behavior unchanged for this control.
+soulGoldTraceFirstCopy:
+    mov r2, r10
     sg_trace_mark 7, 0x7FE0
     movs pc, lr
 
-soulGoldTraceHeaderRead:
-    ldrb r3, [r3]
-    // Yellow: expected type-5 header byte. Red: unexpected byte.
-    // Latch the first header so later resources cannot overwrite it.
-    str r0, sgTraceSavedR0
-    ldr r13, =0x05000410
-    ldrh r0, [r13]
-    ldr r13, =0x2108
-    cmp r0, r13
-    ldr r0, sgTraceSavedR0
-    bne 1f
-    cmp r3, #5
-    bne 2f
+soulGoldTraceFirstCall:
+    str r1, [r7, #0x20]
     sg_trace_mark 8, 0x03FF
     movs pc, lr
-2:
-    sg_trace_mark 8, 0x001F
-1:
-    movs pc, lr
 
-soulGoldTraceDecoder:
-    ldr r3, =0x03000358
+soulGoldTraceFirstReturn:
+    mov r3, r10
     sg_trace_mark 9, 0x03E0
     movs pc, lr
 
-soulGoldTraceLookup:
-    ldr r1, =0x083FBE0C
+soulGoldTraceSecondCall:
+    ldr r1, [r7, #0x38]
     sg_trace_mark 10, 0x7C1F
     movs pc, lr
 
-soulGoldTraceLookupReturn:
-    mov r12, r0
+soulGoldTraceSecondReturn:
+    ldr r0, [r7, #0x3c]
     sg_trace_mark 11, 0x01FF
     movs pc, lr
 
-soulGoldTraceCopyReturn:
-    mov r2, r10
+soulGoldTraceResourceReturn:
+    ldr r0, =0x086801C4
     sg_trace_mark 12, 0x7C00
     movs pc, lr
 
