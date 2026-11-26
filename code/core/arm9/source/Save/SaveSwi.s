@@ -15,7 +15,7 @@ arm_func sav_swiHandler
     cmp r13, #0x9E
         beq soulGoldTraceSecondReturn
     cmp r13, #0x9F
-        beq soulGoldTraceResourceReturn
+        beq sgVerifyMixerCopy
     cmp r13, #0x95
         beq soulGoldTraceId
     cmp r13, #0x96
@@ -530,6 +530,54 @@ sgTraceVblankSample:
     bne 2b
     bx lr
 
+// Compare actual mixer bytes against a verified ROM copy. Correct only
+// differing words, synchronize executable RAM, reconstruct the original
+// literal load and return with all other guest registers/flags intact.
+sgVerifyMixerCopy:
+    str r1, sgMixerSavedR1
+    str r2, sgMixerSavedR2
+    str r3, sgMixerSavedR3
+    str r12, sgTraceHexSavedR12
+    mov r13, #1
+    str r13, sgFaultCallStage
+    ldr r1, =sgMixerReference
+    ldr r2, =0x030011D8
+    ldr r3, =0x03001D18
+1:
+    ldr r0, [r1], #4
+    ldr r12, [r2]
+    cmp r0, r12
+    strne r0, [r2]
+    movne r13, #2
+    strne r13, sgFaultCallStage
+    add r2, r2, #4
+    cmp r2, r3
+    blo 1b
+    ldr r2, =0x030011C0
+    ldr r3, =0x03001D20
+2:
+    mcr p15, 0, r2, c7, c10, 1
+    add r2, r2, #32
+    cmp r2, r3
+    blo 2b
+    mov r0, #0
+    mcr p15, 0, r0, c7, c10, 4
+    ldr r2, =0x030011C0
+3:
+    mcr p15, 0, r2, c7, c5, 1
+    add r2, r2, #32
+    cmp r2, r3
+    blo 3b
+    ldr r0, sgFaultCallStage
+    orr r0, r0, #0x52000000
+    sg_hex 0x06204044
+    ldr r1, sgMixerSavedR1
+    ldr r2, sgMixerSavedR2
+    ldr r3, sgMixerSavedR3
+    ldr r12, sgTraceHexSavedR12
+    ldr r0, =0x030045C8
+    movs pc, lr
+
 // Terminal diagnostic in abort mode. IRQ/FIQ disabled; no stack needed.
 // LR was adjusted by memu_prefetchAbort to the faulting fetch address.
 .global sgTraceInvalidFetch
@@ -559,12 +607,18 @@ sgTraceInvalidFetch:
     orr r0, r0, r13, lsl #8
     ldr r13, sgFaultCallStage
     orr r0, r0, r13
-    orr r0, r0, #0x49000000
-    sg_hex 0x06204044 // 49 BB CC SS: build ID, BIOS phase, VM CPSR, stage
+    orr r0, r0, #0x52000000
+    sg_hex 0x06204044 // 52 BB CC SS: build ID, BIOS phase, VM CPSR, copy status
 1:
     b 1b
 
 .balign 4
+sgMixerSavedR1:
+    .word 0
+sgMixerSavedR2:
+    .word 0
+sgMixerSavedR3:
+    .word 0
 .global sgLastHicodeMiss
 sgLastHicodeMiss:
     .word 0

@@ -562,9 +562,49 @@ static bool tryPatchSoulgold121()
     return true;
 }
 
+// Experiment 052: retain original audio engine and verify its actual
+// IWRAM executable image after the game's CpuSet. Reference data comes
+// from the user's ROM at runtime; no game code is embedded in this build.
+extern "C" {
+    [[gnu::section(".ewram.bss"), gnu::aligned(32)]]
+    u8 sgMixerReference[0xB40];
+}
+static void tryPatchSoulgoldMixerCopy(FIL* romFile)
+{
+    u8* const rom = (u8*)ROM_LINEAR_DS_ADDRESS;
+    static const u16 initSig[] = {
+        0xB5F0,0x2301,0x46D6,0x464F,0x4646,0x4835,
+        0x4A35,0x4398,0xB5C0,0x4935,0xF65B,0xF874,0x4834
+    };
+    static const u32 pool[] = {0x0828FA0D,0x040002D0,0x030011D8,0x030045C8};
+    if (memcmp(rom + 0x1A5234, initSig, sizeof(initSig)) ||
+        memcmp(rom + 0x1A5314, pool, sizeof(pool)))
+        return;
+    const auto oldPos = f_tell(romFile);
+    UINT count = 0;
+    const bool ok = f_lseek(romFile, 0x28FA0C) == FR_OK &&
+        f_read(romFile, sgMixerReference, sizeof(sgMixerReference), &count) == FR_OK &&
+        count == sizeof(sgMixerReference);
+    if (f_lseek(romFile, oldPos) != FR_OK || !ok)
+        return;
+    u32 hash = 2166136261u;
+    for (u32 i = 0; i < sizeof(sgMixerReference); ++i)
+        hash = (hash ^ sgMixerReference[i]) * 16777619u;
+    if (hash != 0xFC28284Au)
+        return;
+    // Replaces LDR r0,[PC,#0xD0], immediately after original CpuSet.
+    *(u16*)(rom + 0x1A524C) = 0xDF9F;
+}
+
 bool flash_patch1MV103(const SaveTypeInfo* saveTypeInfo, FIL* romFile, u32 tagRomAddress, u8* tempBuffer)
 {
-    if (tryPatchSoulgold121() || tryPatchFlash1MV103Gcc())
+    if (tryPatchSoulgold121())
+    {
+        tryPatchSoulgoldMixerCopy(romFile);
+        initializeFlash1M();
+        return true;
+    }
+    if (tryPatchFlash1MV103Gcc())
     {
         initializeFlash1M();
         return true;
