@@ -409,6 +409,13 @@ static bool tryPatchFlash1MV103Gcc()
 // SoulGold v1.2.1 uses different GCC-generated Thumb prologues from Emerald Rogue.
 // These offsets are validated against this precise ROM layout before anything is patched.
 // Never use this for another ROM version unless its binary layout has been checked.
+// Diagnostic-only callback. Deliberately no memory or display accesses:
+// the save SWI handler calls this function in ARM user mode.
+static u16 soulGoldIdentifyFailureControl()
+{
+    return 1;
+}
+
 static bool tryPatchSoulgold121()
 {
     u8* const rom = (u8*)ROM_LINEAR_DS_ADDRESS;
@@ -448,16 +455,12 @@ static bool tryPatchSoulgold121()
     sPatchInfo.flMaxTimePtr = (u32*)expectedPointers[5];
     sPatchInfo.flashPtr = (u32*)expectedPointers[6];
 
-    sav_swiTable[0] = (void*)identifyFlash1M;
-    sav_swiTable[1] = (void*)readFlash;
-    sav_swiTable[2] = (void*)verifyFlashSector;
-    sav_swiTable[3] = (void*)verifyFlash;
-    // CONTROL: patch ONLY IdentifyFlash in SoulGold v1.2.1.
-    // Leave ReadFlash and both VerifyFlash entrypoints untouched to isolate
-    // whether one of the three auxiliary hooks causes the boot freeze.
+    // Same failure return as experiment 010, but via the original
+    // GBARunner3 SWI dispatch path. No writes from the callback.
+    sav_swiTable[0] = (void*)soulGoldIdentifyFailureControl;
     *(u16*)(rom + 0x61B0) = SAVE_THUMB_SWI(0);
-    sSoulgoldRuntimeProbeEnabled = true;
-    GFX_PLTT_BG_SUB[0] = 0x001F; // red: patch installed but not yet invoked
+    sSoulgoldRuntimeProbeEnabled = false;
+    GFX_PLTT_BG_SUB[0] = 0x7C1F; // magenta: SWI failure-control installed
     return true;
 }
 
