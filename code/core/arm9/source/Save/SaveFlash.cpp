@@ -452,10 +452,10 @@ static bool tryPatchSoulgold121()
     sav_swiTable[1] = (void*)readFlash;
     sav_swiTable[2] = (void*)verifyFlashSector;
     sav_swiTable[3] = (void*)verifyFlash;
+    // CONTROL: patch ONLY IdentifyFlash in SoulGold v1.2.1.
+    // Leave ReadFlash and both VerifyFlash entrypoints untouched to isolate
+    // whether one of the three auxiliary hooks causes the boot freeze.
     *(u16*)(rom + 0x61B0) = SAVE_THUMB_SWI(0);
-    *(u16*)(rom + 0x5F04) = SAVE_THUMB_SWI(1);
-    *(u16*)(rom + 0x5FD8) = SAVE_THUMB_SWI(2);
-    *(u16*)(rom + 0x607C) = SAVE_THUMB_SWI(3);
     sSoulgoldRuntimeProbeEnabled = true;
     GFX_PLTT_BG_SUB[0] = 0x001F; // red: patch installed but not yet invoked
     return true;
