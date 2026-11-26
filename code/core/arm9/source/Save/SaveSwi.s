@@ -305,6 +305,14 @@ soulGoldTraceResourceReturn:
     // Distinct low bytes for all seven guarded SWI sites, unchanged by
     // the linear ROM alias. Preserve guest flags through SPSR.
     and r13, lr, #0xFF
+    cmp r13, #0x26
+    beq sgTaskEntry
+    cmp r13, #0x4A
+    beq sgTaskDispatch
+    cmp r13, #0x52
+    beq sgTaskReturn
+    cmp r13, #0x5C
+    beq sgTaskExit
     cmp r13, #0x30
     beq sgCallbackCall1
     cmp r13, #0x34
@@ -373,13 +381,46 @@ sgCallbackCall3:
     sg_callback_prefix 3, 0x102000
 sgCallbackCall4:
     sg_callback_prefix 4, 0x078000
-sgCallbackExit:
+// Retain bottom-left loop counter, put scheduler stage bottom-right.
+// The active task function pointer is written top-right.
+.macro sg_task_stage stage
     str r0, sgTraceHexSavedR0
     str r12, sgTraceHexSavedR12
-    mov r0, #5
+    mov r0, #\stage
     sg_hex 0x0620455C
     ldr r12, sgTraceHexSavedR12
     ldr r0, sgTraceHexSavedR0
+.endm
+
+sgTaskEntry:
+    ldr r3, =0x03005B50
+    sg_task_stage 0x11
+    movs pc, lr
+
+sgTaskDispatch:
+    // Original LDR r3,[r5,r4].
+    ldr r3, [r5, r4]
+    sg_task_stage 0x12
+    str r0, sgTraceHexSavedR0
+    str r12, sgTraceHexSavedR12
+    mov r0, r3
+    sg_hex 0x0620405C
+    ldr r12, sgTraceHexSavedR12
+    ldr r0, sgTraceHexSavedR0
+    movs pc, lr
+
+sgTaskReturn:
+    ldrb r0, [r4, #6]
+    sg_task_stage 0x13
+    movs pc, lr
+
+sgTaskExit:
+    sg_task_stage 0x14
+    b sgTraceBxR0
+
+sgCallbackExit:
+    sg_task_stage 5
+sgTraceBxR0:
     // Emulate BX r0, including ARM/Thumb state.
     mov lr, r0
     mrs r13, spsr

@@ -8,6 +8,7 @@
 #include "SaveFlashDefinitions.h"
 #include "SaveTypeInfo.h"
 #include "MemoryEmulator/RomDefs.h"
+#include "SdCache/SdCache.h"
 #include "SaveFlash.h"
 
 #define MAKER_ID_MACRONIX           0xC2
@@ -508,6 +509,25 @@ static bool tryPatchSoulgold121()
     {
         return false;
     }
+
+    // The first post-read function is a task scheduler in high ROM.
+    // Pin its 4 KiB block through the normal ROM patch-cache API.
+    // All offsets below are within that same block. Verify before writing.
+    u8* const taskCode = (u8*)sdc_loadRomBlockForPatching(0x08262220);
+    if (*(u16*)(taskCode + 0x04) != 0x4B0D ||
+        *(u16*)(taskCode + 0x28) != 0x592B ||
+        *(u16*)(taskCode + 0x30) != 0x79A0 ||
+        *(u16*)(taskCode + 0x3A) != 0x4700 ||
+        *(u32*)(taskCode + 0x3C) != 0x03005B50 ||
+        *(u32*)(taskCode + 0x40) != 0x03005B4C ||
+        *(u16*)(taskCode + 0x168) != 0x4718)
+    {
+        return false;
+    }
+    *(u16*)(taskCode + 0x04) = 0xDF9F; // scheduler entry
+    *(u16*)(taskCode + 0x28) = 0xDF9F; // load task function pointer
+    *(u16*)(taskCode + 0x30) = 0xDF9F; // task returned
+    *(u16*)(taskCode + 0x3A) = 0xDF9F; // scheduler exit
 
     // Trace SWIs execute in privileged mode and faithfully replace the
     // guarded Thumb instructions (see SaveSwi.s). Earlier lights persist.
