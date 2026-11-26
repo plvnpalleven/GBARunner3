@@ -530,6 +530,14 @@ static bool tryPatchSoulgold121()
         return false;
     }
 
+    // Experiment 051: isolate the sound mixer. The exact verified Thumb
+    // wrapper is PUSH {LR}; BL 0828F988; POP {R0}; BX R0.
+    // Returning immediately is diagnostic only: music/audio may stop.
+    // No ROM file writes, and no changes to the RNG.
+    static const u16 soundMainWrapper[] = {0xB500, 0xF0EA, 0xFED9, 0xBC01, 0x4700};
+    if (memcmp(rom + 0x1A4BD0, soundMainWrapper, sizeof(soundMainWrapper)) == 0)
+        *(u16*)(rom + 0x1A4BD0) = 0x4770; // BX LR
+
     // Retain only functional compatibility hooks. All original main-loop,
     // branch, callback, VBlank and ordinary startup instructions stay intact.
     *(u16*)(rom + 0x5CB4) = 0xDF95; // return native Flash chip ID

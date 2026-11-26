@@ -559,8 +559,8 @@ sgTraceInvalidFetch:
     orr r0, r0, r13, lsl #8
     ldr r13, sgFaultCallStage
     orr r0, r0, r13
-    orr r0, r0, #0x49000000
-    sg_hex 0x06204044 // 49 BB CC SS: build ID, BIOS phase, VM CPSR, stage
+    orr r0, r0, #0x51000000
+    sg_hex 0x06204044 // 51 BB CC SS: build ID, BIOS phase, VM CPSR, stage
 1:
     b 1b
 
