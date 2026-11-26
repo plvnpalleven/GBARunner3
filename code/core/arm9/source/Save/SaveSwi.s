@@ -364,7 +364,31 @@ sgTraceVblankSample:
     bne 2b
     bx lr
 
+// Terminal diagnostic in abort mode. IRQ/FIQ disabled; no stack needed.
+// LR was adjusted by memu_prefetchAbort to the faulting fetch address.
+.global sgTraceInvalidFetch
+sgTraceInvalidFetch:
+    msr cpsr_c, #0xD7
+    ldr r13, =0x05000402
+    mov r0, #0x001F
+    strh r0, [r13] // tile 1 red: invalid fetch captured
+    mov r0, lr
+    sg_hex 0x0620405C // exact faulting fetch address
+    ldr r13, =sgTraceFaultRegs
+    stmia r13, {sp,lr}^
+    nop
+    ldr r0, sgTraceFaultRegs
+    sg_hex 0x062042C4 // user SP
+    ldr r0, sgTraceFaultRegs+4
+    sg_hex 0x062042DC // user LR
+    mrs r0, spsr
+    sg_hex 0x0620455C // interrupted CPU status
+1:
+    b 1b
+
 .balign 4
+sgTraceFaultRegs:
+    .space 8
 sgTraceVblankCount:
     .word 0
 sgTraceSavedR0:

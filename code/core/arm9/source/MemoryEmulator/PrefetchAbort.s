@@ -7,6 +7,17 @@
 
 arm_func memu_prefetchAbort
     sub lr, lr, #4
+#ifndef GBAR3_TEST
+    // High invalid fetch targets cannot be normal guest ROM or RAM.
+    // Stop only for the guarded SoulGold diagnostic, before mapping them.
+    cmp lr, #0x0E000000
+    blo 9f
+    ldr r13, =gSoulgoldTraceEnabled
+    ldrb r13, [r13]
+    cmp r13, #0
+    ldrne pc, =sgTraceInvalidFetch
+9:
+#endif
     cmp lr, #0x03000000
         addlo lr, lr, #(ROM_LINEAR_GBA_ADDRESS - ROM_LINEAR_DS_ADDRESS) // relative rom
     cmp lr, #0x07000000
