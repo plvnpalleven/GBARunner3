@@ -196,8 +196,41 @@ soulGoldTraceFirstReturn:
     movs pc, lr
 
 soulGoldTraceSecondCall:
+    // SoulGold copies ARM code to r4 from a ROM resource immediately
+    // before this call. The copy length is stored at [r7, #0x2c].
+    // Preserve guest r0 and reconstruct r1 using the replaced LDR.
+    // IWRAM is not data cached, but is instruction cached on this build.
+    str r0, sgTraceSavedR0
+    mov r0, r4
+    tst r0, #3
+    bne sgSecondSyncSkipped
+    mov r1, r0, lsr #24
+    cmp r1, #3
+    bne sgSecondSyncSkipped
+    ldr r1, [r7, #0x2c]
+    cmp r1, #0
+    beq sgSecondSyncSkipped
+    cmp r1, #0x8000
+    bhi sgSecondSyncSkipped
+    add r1, r0, r1
+    cmp r1, #0x04000000
+    bhi sgSecondSyncSkipped
+    bic r0, r0, #31
+    mcr p15, 0, r0, c7, c10, 4 // drain write buffer
+sgSecondSyncLine:
+    mcr p15, 0, r0, c7, c5, 1 // invalidate one instruction-cache line by address
+    add r0, r0, #32
+    cmp r0, r1
+    blo sgSecondSyncLine
+    ldr r0, sgTraceSavedR0
     ldr r1, [r7, #0x38]
-    sg_trace_mark 10, 0x7C1F
+    sg_trace_mark 10, 0x7C1F // magenta: cache sync performed
+    movs pc, lr
+
+sgSecondSyncSkipped:
+    ldr r0, sgTraceSavedR0
+    ldr r1, [r7, #0x38]
+    sg_trace_mark 10, 0x001F // red: unexpected destination or size; no sync
     movs pc, lr
 
 soulGoldTraceSecondReturn:
