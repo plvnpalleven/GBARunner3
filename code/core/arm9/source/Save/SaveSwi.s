@@ -5,17 +5,17 @@
 
 arm_func sav_swiHandler
     cmp r13, #0x9A
-        beq soulGoldTracePostFlash
-    cmp r13, #0x9B
-        beq soulGoldTraceRtc
-    cmp r13, #0x9C
-        beq soulGoldTracePostRtc
-    cmp r13, #0x9D
-        beq soulGoldTraceAccuracy
-    cmp r13, #0x9E
-        beq soulGoldTracePreLoop
-    cmp r13, #0x9F
         beq soulGoldTraceLoop
+    cmp r13, #0x9B
+        beq soulGoldTraceCallback
+    cmp r13, #0x9C
+        beq soulGoldTraceScreen
+    cmp r13, #0x9D
+        beq soulGoldTraceClear
+    cmp r13, #0x9E
+        beq soulGoldTraceGraphics
+    cmp r13, #0x9F
+        beq soulGoldTraceFrame
     cmp r13, #0x95
         beq soulGoldTraceId
     cmp r13, #0x96
@@ -180,34 +180,58 @@ soulGoldTraceRead:
     b sav_swiHandler
 
 // Preserve exact original instruction effects, including condition flags.
-soulGoldTracePostFlash:
-    ldr r3, =0x0203E140
+soulGoldTraceLoop:
+    ldr r3, =0x030040C0
     sg_trace_mark 7, 0x7FE0
     movs pc, lr
 
-soulGoldTraceRtc:
-    mov r8, r0
+soulGoldTraceCallback:
+    ldr r3, [r4, #4]
+    // Keep the first callback result; later frames cannot overwrite it.
+    str r0, sgTraceSavedR0
+    ldr r13, =0x05000410
+    ldrh r0, [r13]
+    ldr r13, =0x2108
+    cmp r0, r13
+    ldr r0, sgTraceSavedR0
+    bne 3f
+    cmp r3, #0
+    beq 1f
+    ldr r13, =0x0818B7F1
+    cmp r3, r13
+    bne 2f
     sg_trace_mark 8, 0x03FF
     movs pc, lr
+1:
+    sg_trace_mark 8, 0x001F
+    movs pc, lr
+2:
+    sg_trace_mark 8, 0x7C1F
+3:
+    movs pc, lr
 
-soulGoldTracePostRtc:
-    ldr r0, =0x0201B11C
+soulGoldTraceScreen:
+    ldr r5, =0x030055C0
     sg_trace_mark 9, 0x03E0
     movs pc, lr
 
-soulGoldTraceAccuracy:
-    ldr r2, =0x030040BC
+soulGoldTraceClear:
+    ldr r2, =0x010001FF
     sg_trace_mark 10, 0x7C1F
     movs pc, lr
 
-soulGoldTracePreLoop:
-    str r7, [r5, #0x44]
+soulGoldTraceGraphics:
+    ldr r3, =0x0000FFFF
     sg_trace_mark 11, 0x01FF
     movs pc, lr
 
-soulGoldTraceLoop:
-    ldr r3, =0x030040C0
+soulGoldTraceFrame:
     sg_trace_mark 12, 0x7C00
+    // Original branches both target 0x081A700C.
+    // LR ends in 0x8C or 0xEC in either ROM mapping.
+    tst lr, #0x40
+    subeq lr, lr, #128
+    subne lr, lr, #224
     movs pc, lr
 
 .balign 4
