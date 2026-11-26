@@ -174,7 +174,27 @@ soulGoldTraceTimer:
     sub lr, lr, #14 // replaced branch 0xE7F8 to 0x081A3D4C
     movs pc, lr
 
+// Draw eight hex digits. Guest r0/r12 saved by caller; r13 is banked.
+.macro sg_hex destination
+    ldr r13, =\destination
+    .rept 8
+        mov r12, r0, lsr #28
+        add r12, r12, #16
+        strh r12, [r13], #2
+        mov r0, r0, lsl #4
+    .endr
+.endm
+
 soulGoldTraceRead:
+    str r0, sgTraceHexSavedR0
+    str r12, sgTraceHexSavedR12
+    ldr r13, =sgTraceReadCaller
+    stmia r13, {lr}^
+    nop
+    ldr r0, sgTraceReadCaller
+    sg_hex 0x06204044
+    ldr r12, sgTraceHexSavedR12
+    ldr r0, sgTraceHexSavedR0
     sg_trace_mark 6, 0x7C00 // blue: entered save read
     // Same privileged call/return convention as sav_swiReadSaveByteFromFile.
     // The next guest instruction is BX LR, so no old prologue executes.
@@ -292,10 +312,34 @@ soulGoldTraceResourceReturn:
     ldr r0, sgTraceSavedR0
     bne 1f
     sg_trace_mark 12, 0x7C00
+    str r0, sgTraceHexSavedR0
+    str r12, sgTraceHexSavedR12
+    ldr r0, sgTraceCallbackCount
+    cmp r0, #0
+    bne 2f
+    mov r0, r3
+    sg_hex 0x062042C4
+2:
+    mov r0, r3
+    sg_hex 0x062042DC
+    ldr r0, sgTraceCallbackCount
+    add r0, r0, #1
+    str r0, sgTraceCallbackCount
+    sg_hex 0x06204544
+    ldr r12, sgTraceHexSavedR12
+    ldr r0, sgTraceHexSavedR0
 1:
     movs pc, lr
 
 .balign 4
 sgTraceSavedR0:
+    .word 0
+sgTraceHexSavedR0:
+    .word 0
+sgTraceHexSavedR12:
+    .word 0
+sgTraceReadCaller:
+    .word 0
+sgTraceCallbackCount:
     .word 0
 .pool

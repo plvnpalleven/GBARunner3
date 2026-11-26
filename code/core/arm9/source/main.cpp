@@ -457,6 +457,39 @@ static void setupSoulgoldTraceDisplay()
     for (u32 i = 1; i <= 12; ++i)
         GFX_PLTT_BG_SUB[i] = 0x2108; // gray: not reached
     GFX_PLTT_BG_SUB[1] = 0x7FE0; // cyan: patch installed
+    static const u8 hexFont[16][7] = {
+        { 14, 17, 19, 21, 25, 17, 14 },
+        { 4, 12, 4, 4, 4, 4, 14 },
+        { 14, 17, 1, 2, 4, 8, 31 },
+        { 30, 1, 1, 14, 1, 1, 30 },
+        { 2, 6, 10, 18, 31, 2, 2 },
+        { 31, 16, 16, 30, 1, 1, 30 },
+        { 14, 16, 16, 30, 17, 17, 14 },
+        { 31, 1, 2, 4, 8, 8, 8 },
+        { 14, 17, 17, 14, 17, 17, 14 },
+        { 14, 17, 17, 15, 1, 1, 14 },
+        { 14, 17, 17, 31, 17, 17, 17 },
+        { 30, 17, 17, 30, 17, 17, 30 },
+        { 14, 17, 16, 16, 16, 17, 14 },
+        { 30, 17, 17, 17, 17, 17, 30 },
+        { 31, 16, 16, 30, 16, 16, 31 },
+        { 31, 16, 16, 30, 16, 16, 16 }
+    };
+    GFX_PLTT_BG_SUB[13] = 0x7FFF;
+    for (u32 digit = 0; digit < 16; ++digit)
+        for (u32 y = 0; y < 8; ++y)
+            for (u32 pair = 0; pair < 4; ++pair)
+            {
+                u16 packed = 0;
+                for (u32 px = 0; px < 2; ++px)
+                {
+                    u32 x = pair * 2 + px;
+                    if (y < 7 && x >= 1 && x <= 5 &&
+                        (hexFont[digit][y] & (1u << (5 - x))))
+                        packed |= 13u << (px * 8);
+                }
+                tiles[(16 + digit) * 32 + y * 4 + pair] = packed;
+            }
     REG_BG0CNT_SUB = 0x0880; // 8bpp BG0, screen block 8
     REG_BG0HOFS_SUB = 0;
     REG_BG0VOFS_SUB = 0;
