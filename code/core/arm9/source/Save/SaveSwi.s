@@ -4,6 +4,16 @@
 #include "AsmMacros.inc"
 
 arm_func sav_swiHandler
+    cmp r13, #0x95
+        beq soulGoldTraceId
+    cmp r13, #0x96
+        beq soulGoldTracePointers
+    cmp r13, #0x97
+        beq soulGoldTraceReturn
+    cmp r13, #0x98
+        beq soulGoldTraceTimer
+    cmp r13, #0x99
+        beq soulGoldTraceRead
     cmp r13, #0x90
         beq sav_swiReadSaveByte
     cmp r13, #0x91
@@ -117,3 +127,47 @@ thumb_func sav_writeSaveByteToFileFromUserMode
 thumb_func sav_flushSaveFileFromUserMode
     swi 0x94
     bx lr
+
+
+// Privileged trace markers. SWI entry has interrupts masked. Preserve r0
+// except for the chip ID return value; r13 is already the SWI scratch reg.
+// movs pc,lr restores the original Thumb CPSR including condition flags.
+.arm
+.balign 4
+.macro sg_trace_mark slot, color
+    str r0, sgTraceSavedR0
+    ldr r13, =0x05000400 + (2 * \slot)
+    ldr r0, =\color
+    strh r0, [r13]
+    ldr r0, sgTraceSavedR0
+.endm
+
+soulGoldTraceId:
+    sg_trace_mark 2, 0x03FF
+    ldr r0, =0x000009C2
+    movs pc, lr
+
+soulGoldTracePointers:
+    str r3, [r2] // replaced 0x6013
+    sg_trace_mark 3, 0x03E0
+    movs pc, lr
+
+soulGoldTraceReturn:
+    ldr r3, =0x030040BC // replaced literal load at 0x081A3D42
+    sg_trace_mark 4, 0x7C1F
+    movs pc, lr
+
+soulGoldTraceTimer:
+    sg_trace_mark 5, 0x01FF
+    sub lr, lr, #14 // replaced branch 0xE7F8 to 0x081A3D4C
+    movs pc, lr
+
+soulGoldTraceRead:
+    sg_trace_mark 6, 0x7C00
+    mov r13, #0x81 // proceed with original readFlash SWI dispatch
+    b sav_swiHandler
+
+.balign 4
+sgTraceSavedR0:
+    .word 0
+.pool

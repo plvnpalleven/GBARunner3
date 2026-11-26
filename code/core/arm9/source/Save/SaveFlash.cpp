@@ -46,6 +46,7 @@ static flash_v120_type sFlashType;
 // RED: compatibility patch installed but IdentifyFlash has not entered.
 // YELLOW: IdentifyFlash entered; GREEN: IdentifyFlash finished.
 static bool sSoulgoldRuntimeProbeEnabled = false;
+extern "C" { u8 gSoulgoldTraceEnabled = 0; }
 static const u16 sMaxTime[] = { 0xA, 0xFFBD, 0xC2, 0xA, 0xFFBD, 0xC2, 0x28, 0xFFBD, 0xC2, 0xC8, 0xFFBD, 0xC2 };
 
 static void readFlash(u16 secNo, u32 offset, u8* dst, u32 size)
@@ -468,10 +469,25 @@ static bool tryPatchSoulgold121()
         return false;
     }
 
-    // Thumb: ldr r0, [pc, #0]; bx lr; .word 0x000009C2.
-    *(u16*)(rom + 0x5CB4) = 0x4800;
-    *(u16*)(rom + 0x5CB6) = 0x4770;
-    *(u32*)(rom + 0x5CB8) = 0x000009C2;
+    // Exact v1.2.1 callsite and epilogue guards, checked against the ROM.
+    if (*(u16*)(rom + 0x620E) != 0x6013 ||
+        *(u16*)(rom + 0x1A3D3E) != 0xF662 ||
+        *(u16*)(rom + 0x1A3D40) != 0xFA37 ||
+        *(u16*)(rom + 0x1A3D42) != 0x4B06 ||
+        *(u16*)(rom + 0x1A3D44) != 0x2800 ||
+        *(u16*)(rom + 0x1A3D58) != 0xE7F8 ||
+        *(u32*)(rom + 0x1A3D5C) != 0x030040BC)
+    {
+        return false;
+    }
+
+    // Trace SWIs execute in privileged mode and faithfully replace the
+    // guarded Thumb instructions (see SaveSwi.s). Earlier lights persist.
+    *(u16*)(rom + 0x5CB4) = 0xDF95; // return chip ID, mark slot 2
+    *(u16*)(rom + 0x5CB6) = 0x4770; // bx lr
+    *(u16*)(rom + 0x620E) = 0xDF96; // str r3,[r2], mark slot 3
+    *(u16*)(rom + 0x1A3D42) = 0xDF97; // ldr r3,[pc,#24], mark slot 4
+    *(u16*)(rom + 0x1A3D58) = 0xDF98; // branch after InitFlashTimer, slot 5
 
     // The native setup table continues to point into the ROM, but the
     // actual Flash operations dispatch through GBARunner3's save hooks.
@@ -479,7 +495,7 @@ static bool tryPatchSoulgold121()
     sav_swiTable[1] = (void*)readFlash;
     sav_swiTable[2] = (void*)verifyFlashSector;
     sav_swiTable[3] = (void*)verifyFlash;
-    *(u16*)(rom + 0x5F04) = SAVE_THUMB_SWI(1);
+    *(u16*)(rom + 0x5F04) = 0xDF99; // trace ReadFlash, then normal SWI 1
     *(u16*)(rom + 0x5FD8) = SAVE_THUMB_SWI(2);
     *(u16*)(rom + 0x607C) = SAVE_THUMB_SWI(3);
     *(u16*)(rom + 0x64A4) = SAVE_THUMB_SWI(8);
@@ -489,7 +505,8 @@ static bool tryPatchSoulgold121()
 
     // No runtime writes to restricted hardware display registers.
     sSoulgoldRuntimeProbeEnabled = false;
-    GFX_PLTT_BG_SUB[0] = 0x7FE0; // cyan: native-init experiment installed
+    gSoulgoldTraceEnabled = 1;
+    GFX_PLTT_BG_SUB[0] = 0x7FE0; // cyan during splash; grid after splash
     return true;
 }
 

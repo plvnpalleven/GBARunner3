@@ -434,6 +434,35 @@ static void stopSplashScreenAnimation()
 }
 
 extern u32 hicodeUndefinedData[];
+extern "C" u8 gSoulgoldTraceEnabled;
+
+static void setupSoulgoldTraceDisplay()
+{
+    // C is dedicated to the SUB BG for this diagnostic. VBlank capture is
+    // disabled for SoulGold by the matching IRQ change.
+    REG_DISPCAPCNT = 0;
+    mem_setVramCMapping(MEM_VRAM_C_SUB_BG_00000);
+    volatile u16* const tiles = (volatile u16*)0x06200000;
+    volatile u16* const map = (volatile u16*)0x06204000;
+    for (u32 tile = 0; tile <= 6; ++tile)
+        for (u32 i = 0; i < 32; ++i)
+            tiles[tile * 32 + i] = tile | (tile << 8);
+    for (u32 i = 0; i < 1024; ++i)
+        map[i] = 0;
+    for (u32 stage = 0; stage < 6; ++stage)
+        for (u32 y = 9; y < 15; ++y)
+            for (u32 x = 0; x < 4; ++x)
+                map[y * 32 + 1 + stage * 5 + x] = stage + 1;
+    GFX_PLTT_BG_SUB[0] = 0;
+    for (u32 i = 1; i <= 6; ++i)
+        GFX_PLTT_BG_SUB[i] = 0x2108; // gray: not reached
+    GFX_PLTT_BG_SUB[1] = 0x7FE0; // cyan: patch installed
+    REG_BG0CNT_SUB = 0x0880; // 8bpp BG0, screen block 8
+    REG_BG0HOFS_SUB = 0;
+    REG_BG0VOFS_SUB = 0;
+    REG_MASTER_BRIGHT_SUB = 0;
+    REG_DISPCNT_SUB = 0x10100;
+}
 
 extern "C" void gbaRunnerMain(int argc, char* argv[])
 {
@@ -535,6 +564,8 @@ extern "C" void gbaRunnerMain(int argc, char* argv[])
         REG_DISPCNT_SUB = 0x10000;
         REG_MASTER_BRIGHT_SUB = 0;
         sysipc_setBottomBacklight(true);
+        if (gSoulgoldTraceEnabled)
+            setupSoulgoldTraceDisplay();
     }
     if (displaySettings.enableCenterAndMask)
     {
