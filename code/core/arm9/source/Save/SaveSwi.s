@@ -304,6 +304,15 @@ soulGoldTraceSecondReturn:
     movs pc, lr
 
 soulGoldTraceResourceReturn:
+    and r13, lr, #0xFF
+    cmp r13, #0x30
+    beq sgFaultCall1
+    cmp r13, #0x34
+    beq sgFaultCall2
+    cmp r13, #0x38
+    beq sgFaultCall3
+    cmp r13, #0x3C
+    beq sgFaultCall4
     // Original 0x6863: LDR r3,[r4,#4]. Record only after guest epilogue.
     ldr r3, [r4, #4]
     str r0, sgTraceSavedR0
@@ -314,6 +323,10 @@ soulGoldTraceResourceReturn:
     ldr r0, sgTraceSavedR0
     bne 1f
     sg_trace_mark 12, 0x7C00
+    str r0, sgTraceHexSavedR0
+    mov r0, #0
+    str r0, sgFaultCallStage
+    ldr r0, sgTraceHexSavedR0
     str r0, sgTraceHexSavedR0
     str r12, sgTraceHexSavedR12
     ldr r0, sgTraceCallbackCount
@@ -332,6 +345,30 @@ soulGoldTraceResourceReturn:
     ldr r0, sgTraceHexSavedR0
 1:
     movs pc, lr
+
+// Record the most recent BL prefix without drawing or pausing.
+.macro sg_fault_prefix stage, offset
+    str r0, sgTraceSavedR0
+    mov r0, #\stage
+    str r0, sgFaultCallStage
+    ldr r13, =\offset
+    add r0, lr, #2
+    add r0, r0, r13
+    str r0, sgFaultGuestLink
+    ldr r13, =sgFaultGuestLink
+    ldmia r13, {lr}^
+    nop
+    ldr r0, sgTraceSavedR0
+    movs pc, lr
+.endm
+sgFaultCall1:
+    sg_fault_prefix 1, 0x115000
+sgFaultCall2:
+    sg_fault_prefix 2, 0x100000
+sgFaultCall3:
+    sg_fault_prefix 3, 0x102000
+sgFaultCall4:
+    sg_fault_prefix 4, 0x078000
 
 // IRQ-mode sampler: use only caller-saved r0-r3/r12, never banked SP.
 // Starts after the first post-save callback. A sampled address is not
@@ -383,10 +420,16 @@ sgTraceInvalidFetch:
     sg_hex 0x062042DC // user LR
     mrs r0, spsr
     sg_hex 0x0620455C // interrupted CPU status
+    ldr r0, sgFaultCallStage
+    sg_hex 0x06204044 // last callback call stage, replaces save caller
 1:
     b 1b
 
 .balign 4
+sgFaultCallStage:
+    .word 0
+sgFaultGuestLink:
+    .word 0
 sgTraceFaultRegs:
     .space 8
 sgTraceVblankCount:
