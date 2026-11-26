@@ -477,18 +477,15 @@ static bool tryPatchSoulgold121()
         *(u16*)(rom + 0x1A3D44) != 0x2800 ||
         *(u16*)(rom + 0x1A3D58) != 0xE7F8 ||
         *(u32*)(rom + 0x1A3D5C) != 0x030040BC ||
-        *(u16*)(rom + 0x18B5F6) != 0x493C ||
-        *(u32*)(rom + 0x18B6E8) != 0x05000002 ||
-        *(u16*)(rom + 0x1C4F5A) != 0x4B07 ||
-        *(u32*)(rom + 0x1C4F78) != 0x02038318 ||
-        *(u16*)(rom + 0x18B604) != 0x4839 ||
-        *(u32*)(rom + 0x18B6EC) != 0x0868028C ||
-        *(u16*)(rom + 0x18B60C) != 0x4838 ||
-        *(u32*)(rom + 0x18B6F0) != 0x086801C4 ||
-        *(u16*)(rom + 0x18B618) != 0x4837 ||
-        *(u32*)(rom + 0x18B6F8) != 0x0868054C ||
-        *(u16*)(rom + 0x18B630) != 0x4B32 ||
-        *(u32*)(rom + 0x18B6FC) != 0x0000FFFF)
+        *(u16*)(rom + 0x11FF4A) != 0x4A1A ||
+        *(u32*)(rom + 0x11FFB4) != 0x04000002 ||
+        *(u16*)(rom + 0x11FF56) != 0x781B ||
+        *(u16*)(rom + 0x11F90A) != 0x4BD7 ||
+        *(u32*)(rom + 0x11FC68) != 0x03000358 ||
+        *(u16*)(rom + 0x11F9A0) != 0x49B4 ||
+        *(u32*)(rom + 0x11FC74) != 0x083FBE0C ||
+        *(u16*)(rom + 0x11F9AC) != 0x4684 ||
+        *(u16*)(rom + 0x11FADA) != 0x4652)
     {
         return false;
     }
@@ -500,13 +497,13 @@ static bool tryPatchSoulgold121()
     *(u16*)(rom + 0x620E) = 0xDF96; // str r3,[r2], mark slot 3
     *(u16*)(rom + 0x1A3D42) = 0xDF97; // ldr r3,[pc,#24], mark slot 4
     *(u16*)(rom + 0x1A3D58) = 0xDF98; // branch after InitFlashTimer, slot 5
-    // Graphics subtrace: verified Thumb literal loads in the exact ROM.
-    *(u16*)(rom + 0x18B5F6) = 0xDF9A; // before palette fill
-    *(u16*)(rom + 0x1C4F5A) = 0xDF9B; // palette fill returned, reset helper entered
-    *(u16*)(rom + 0x18B604) = 0xDF9C; // reset helper returned, first resource
-    *(u16*)(rom + 0x18B60C) = 0xDF9D; // first resource returned
-    *(u16*)(rom + 0x18B618) = 0xDF9E; // second resource returned
-    *(u16*)(rom + 0x18B630) = 0xDF9F; // remaining graphics setup returned
+    // Trace the actual compressed-resource decoder, not just its caller.
+    *(u16*)(rom + 0x11FF4A) = 0xDF9A; // before reading compressed header
+    *(u16*)(rom + 0x11FF56) = 0xDF9B; // header read; check first byte
+    *(u16*)(rom + 0x11F90A) = 0xDF9C; // custom decompressor entered
+    *(u16*)(rom + 0x11F9A0) = 0xDF9D; // decoder setup helper about to run
+    *(u16*)(rom + 0x11F9AC) = 0xDF9E; // decoder setup helper returned
+    *(u16*)(rom + 0x11FADA) = 0xDF9F; // expected type-5 code copy returned
 
     // The native setup table continues to point into the ROM, but the
     // actual Flash operations dispatch through GBARunner3's save hooks.
