@@ -55,7 +55,29 @@ arm_func hic_undefinedHicodeMiss
     ldmfd sp, {r0-r3,r12,pc}^
 
 notHicodeMiss:
-    // this is not a hicode miss, but a regular undefined instruction
+    // Real undefined instruction, not the cache-fill sentinel. r12
+    // holds the cache word; r3/r12 guest values are still on the stack.
+#ifndef GBAR3_TEST
+    ldr r3, =sgLastRealHicodeWord
+    str r12, [r3]
+    mrs r12, spsr
+    tst r12, #0x20
+    subeq r3, lr, #4
+    subne r3, lr, #2
+    ldr r12, =sgLastRealHicodePc
+    str r3, [r12]
+    beq 2f
+    // Never let a genuine Thumb undefined instruction enter the ARM
+    // decoder in the guarded experiment. High-ROM Thumb JIT fallback
+    // cannot safely read its instruction/aux bits at the guest address.
+    ldr r3, =gSoulgoldTraceEnabled
+    ldrb r3, [r3]
+    cmp r3, #0
+    beq 2f
+    pop {r3,r12}
+    ldr pc, =sgTraceHicodeThumbUndefined
+2:
+#endif
     pop {r3,r12}
     ldr r13,= vm_undefinedInstructionAddr
     str lr, [r13]
