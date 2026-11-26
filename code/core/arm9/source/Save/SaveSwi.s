@@ -318,28 +318,24 @@ soulGoldTraceResourceReturn:
     beq sgTaskReturn
     cmp r13, #0x5C
     beq sgTaskExit
-    cmp r13, #0x54
-    beq sgTitleTask0
-    cmp r13, #0x5E
-    beq sgTitleTask1
-    cmp r13, #0xCC
-    beq sgTitleTask2
-    cmp r13, #0xD8
-    beq sgTitleTask3
-    cmp r13, #0xF2
-    beq sgTitleTask4
-    cmp r13, #0x1A
-    beq sgTitleTask5
-    cmp r13, #0x24
-    beq sgTitleTask6
-    cmp r13, #0x2C
-    beq sgTitleTask7
-    cmp r13, #0x40
-    beq sgTitleTask8
     cmp r13, #0x46
-    beq sgTitleTask9
+    beq sgTitleTask0
+    cmp r13, #0x1C
+    beq sgTitleTask1
+    cmp r13, #0x24
+    beq sgTitleTask2
+    cmp r13, #0x32
+    beq sgTitleTask3
+    cmp r13, #0x3A
+    beq sgTitleTask4
+    cmp r13, #0x4E
+    beq sgTitleTask5
+    cmp r13, #0x56
+    beq sgTitleTask6
+    cmp r13, #0x5E
+    beq sgTitleTask7
     cmp r13, #0x66
-    beq sgTitleTask10
+    beq sgTitleTask8
     // Original 0x6863: LDR r3,[r4,#4]. Record only after guest epilogue.
     ldr r3, [r4, #4]
     str r0, sgTraceSavedR0
@@ -369,59 +365,85 @@ soulGoldTraceResourceReturn:
 1:
     movs pc, lr
 
-// All title-task probes share a compact stage renderer.
+// Restore the exact replaced instruction, including MOVS N/Z flags.
 sgTitleTask0:
-    ldr r7, =0x3005B4C
-    mov r13, #0x20
-    b sgTitleStage
-
-sgTitleTask1:
-    ldrsh r6, [r5, r3]
-    add r13, r6, #0x21
-    b sgTitleStage
-
-sgTitleTask2:
-    ldr r0, =0x814C79D
-    mov r13, #0x30
-    b sgTitleStage
-
-sgTitleTask3:
-    ldr r4, =0x85B6C5C
-    mov r13, #0x31
-    b sgTitleStage
-
-sgTitleTask4:
-    ldr r1, =0x8C4
-    mov r13, #0x32
-    b sgTitleStage
-
-sgTitleTask5:
-    ldr r0, =0x85B7F74
-    mov r13, #0x33
-    b sgTitleStage
-
-sgTitleTask6:
-    ldr r1, =0x600B000
-    mov r13, #0x34
-    b sgTitleStage
-
-sgTitleTask7:
-    ldr r0, =0x85B7A40
-    mov r13, #0x35
-    b sgTitleStage
-
-sgTitleTask8:
-    ldr r0, =0x85B774C
-    mov r13, #0x36
-    b sgTitleStage
-
-sgTitleTask9:
-    ldr r4, =0x85B6CDC
+    ldr r4, =0x085B6CDC
     mov r13, #0x37
     b sgTitleStage
 
-sgTitleTask10:
-    ldr r1, =0x2038334
+sgTitleTask1:
+    mov r5, r0
+    mrs r13, spsr
+    bic r13, r13, #0xC0000000
+    cmp r5, #0
+    orreq r13, r13, #0x40000000
+    orrmi r13, r13, #0x80000000
+    msr spsr_f, r13
+    mov r13, #0x40
+    b sgTitleStage
+
+sgTitleTask2:
+    ldr r3, [r5, #4]
+    mov r13, #0x41
+    b sgTitleStage
+
+sgTitleTask3:
+    mov r5, r0
+    mrs r13, spsr
+    bic r13, r13, #0xC0000000
+    cmp r5, #0
+    orreq r13, r13, #0x40000000
+    orrmi r13, r13, #0x80000000
+    msr spsr_f, r13
+    mov r13, #0x42
+    b sgTitleStage
+
+sgTitleTask4:
+    mov r0, r5
+    mrs r13, spsr
+    bic r13, r13, #0xC0000000
+    cmp r0, #0
+    orreq r13, r13, #0x40000000
+    orrmi r13, r13, #0x80000000
+    msr spsr_f, r13
+    mov r13, #0x43
+    b sgTitleStage
+
+sgTitleTask5:
+    mov r0, r4
+    mrs r13, spsr
+    bic r13, r13, #0xC0000000
+    cmp r0, #0
+    orreq r13, r13, #0x40000000
+    orrmi r13, r13, #0x80000000
+    msr spsr_f, r13
+    mov r13, #0x44
+    b sgTitleStage
+
+sgTitleTask6:
+    mov r0, r4
+    mrs r13, spsr
+    bic r13, r13, #0xC0000000
+    cmp r0, #0
+    orreq r13, r13, #0x40000000
+    orrmi r13, r13, #0x80000000
+    msr spsr_f, r13
+    mov r13, #0x45
+    b sgTitleStage
+
+sgTitleTask7:
+    mov r0, r4
+    mrs r13, spsr
+    bic r13, r13, #0xC0000000
+    cmp r0, #0
+    orreq r13, r13, #0x40000000
+    orrmi r13, r13, #0x80000000
+    msr spsr_f, r13
+    mov r13, #0x46
+    b sgTitleStage
+
+sgTitleTask8:
+    ldr r1, =0x02038334
     mov r13, #0x38
     b sgTitleStage
 

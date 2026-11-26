@@ -621,6 +621,13 @@ extern "C" void gbaRunnerMain(int argc, char* argv[])
     dc_flushRange(gGbaBios, sizeof(gGbaBios));
     ic_invalidateAll();
     setupWramInstructionCache();
+    if (gSoulgoldTraceEnabled)
+    {
+        // Diagnostic: avoid stale instructions for any copied guest RAM code,
+        // not just the already identified type-5 and type-8 call sites.
+        mpu_setRegionInstructionCacheEnable(MPU_REGION_GBA_IWRAM, false);
+        mpu_setRegionInstructionCacheEnable(MPU_REGION_GBA_EWRAM, false);
+    }
     setupRomInstructionCache();
     setupIWramDataCache();
     setupEWramDataCache();

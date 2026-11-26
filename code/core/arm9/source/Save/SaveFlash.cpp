@@ -490,27 +490,17 @@ static bool tryPatchSoulgold121()
         *(u16*)(rom + 0x14C93C) != 0xFE13 ||
         *(u16*)(rom + 0x14C93E) != 0xBC01 ||
         *(u16*)(rom + 0x14C940) != 0x4700 ||
-        *(u16*)(rom + 0x14C952) != 0x4F75 ||
-        *(u32*)(rom + 0x14CB28) != 0x3005B4C ||
-        *(u16*)(rom + 0x14C95C) != 0x5EEE ||
-        *(u16*)(rom + 0x14C9CA) != 0x485C ||
-        *(u32*)(rom + 0x14CB3C) != 0x814C79D ||
-        *(u16*)(rom + 0x14C9D6) != 0x4C5A ||
-        *(u32*)(rom + 0x14CB40) != 0x85B6C5C ||
-        *(u16*)(rom + 0x14C9F0) != 0x4954 ||
-        *(u32*)(rom + 0x14CB44) != 0x8C4 ||
-        *(u16*)(rom + 0x14CA18) != 0x484B ||
-        *(u32*)(rom + 0x14CB48) != 0x85B7F74 ||
-        *(u16*)(rom + 0x14CA22) != 0x494A ||
-        *(u32*)(rom + 0x14CB4C) != 0x600B000 ||
-        *(u16*)(rom + 0x14CA2A) != 0x4849 ||
-        *(u32*)(rom + 0x14CB50) != 0x85B7A40 ||
-        *(u16*)(rom + 0x14CA3E) != 0x4848 ||
-        *(u32*)(rom + 0x14CB60) != 0x85B774C ||
         *(u16*)(rom + 0x14CA44) != 0x4C47 ||
-        *(u32*)(rom + 0x14CB64) != 0x85B6CDC ||
+        *(u16*)(rom + 0x11FF1A) != 0x0005 ||
+        *(u16*)(rom + 0x11FF22) != 0x686B ||
+        *(u16*)(rom + 0x11FF30) != 0x0005 ||
+        *(u16*)(rom + 0x11FF38) != 0x0028 ||
+        *(u16*)(rom + 0x14CA4C) != 0x0020 ||
+        *(u16*)(rom + 0x14CA54) != 0x0020 ||
+        *(u16*)(rom + 0x14CA5C) != 0x0020 ||
         *(u16*)(rom + 0x14CA64) != 0x4940 ||
-        *(u32*)(rom + 0x14CB68) != 0x2038334 ||
+        *(u32*)(rom + 0x14CB64) != 0x085B6CDC ||
+        *(u32*)(rom + 0x14CB68) != 0x02038334 ||
         *(u16*)(rom + 0x1A70C2) != 0x6863 ||
         *(u16*)(rom + 0x1A710A) != 0x6863 ||
         *(u16*)(rom + 0x11F8A4) != 0x4650 ||
@@ -565,18 +555,15 @@ static bool tryPatchSoulgold121()
     *(u16*)(rom + 0x11FA5A) = 0xDF9E; // copied ARM routine returned
     *(u16*)(rom + 0x1A70C2) = 0xDF9F; // main-loop callback load after read
     *(u16*)(rom + 0x1A710A) = 0xDF9F; // alternate main-loop path
-    // Leave the original callback BL pairs intact. Trace the active task
-    // identified on hardware, with guarded literal loads and state read.
-    *(u16*)(rom + 0x14C952) = 0xDF9F;
-    *(u16*)(rom + 0x14C95C) = 0xDF9F;
-    *(u16*)(rom + 0x14C9CA) = 0xDF9F;
-    *(u16*)(rom + 0x14C9D6) = 0xDF9F;
-    *(u16*)(rom + 0x14C9F0) = 0xDF9F;
-    *(u16*)(rom + 0x14CA18) = 0xDF9F;
-    *(u16*)(rom + 0x14CA22) = 0xDF9F;
-    *(u16*)(rom + 0x14CA2A) = 0xDF9F;
-    *(u16*)(rom + 0x14CA3E) = 0xDF9F;
+    // Trace compressed sprite sheets and palette loads.
     *(u16*)(rom + 0x14CA44) = 0xDF9F;
+    *(u16*)(rom + 0x11FF1A) = 0xDF9F;
+    *(u16*)(rom + 0x11FF22) = 0xDF9F;
+    *(u16*)(rom + 0x11FF30) = 0xDF9F;
+    *(u16*)(rom + 0x11FF38) = 0xDF9F;
+    *(u16*)(rom + 0x14CA4C) = 0xDF9F;
+    *(u16*)(rom + 0x14CA54) = 0xDF9F;
+    *(u16*)(rom + 0x14CA5C) = 0xDF9F;
     *(u16*)(rom + 0x14CA64) = 0xDF9F;
 
     // The native setup table continues to point into the ROM, but the
