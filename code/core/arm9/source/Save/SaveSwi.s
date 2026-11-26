@@ -188,15 +188,6 @@ soulGoldTraceTimer:
 .endm
 
 soulGoldTraceRead:
-    str r0, sgTraceHexSavedR0
-    str r12, sgTraceHexSavedR12
-    ldr r13, =sgTraceReadCaller
-    stmia r13, {lr}^
-    nop
-    ldr r0, sgTraceReadCaller
-    sg_hex 0x06204044
-    ldr r12, sgTraceHexSavedR12
-    ldr r0, sgTraceHexSavedR0
     sg_trace_mark 6, 0x7C00 // blue: entered save read
     // Same privileged call/return convention as sav_swiReadSaveByteFromFile.
     // The next guest instruction is BX LR, so no old prologue executes.
@@ -483,92 +474,6 @@ sgVblankWaitEntry:
     ldr r0, sgTraceSavedR0
     movs pc, lr
 
-// Called from the real VM SWI entry with the guest SWI 05 unchanged.
-.global sgTraceVblankBiosDispatch
-sgTraceVblankBiosDispatch:
-    ldr r13, =gSoulgoldTraceEnabled
-    ldrb r13, [r13]
-    cmp r13, #0
-    beq 1f
-    ldr r13, sgTraceCallbackCount
-    cmp r13, #0
-    beq 1f
-    ldr r13, =0x0220030C
-    cmp lr, r13
-    moveq r13, #0x1E
-    streq r13, sgFaultCallStage
-    ldr r13, sgFaultCallStage
-    cmp r13, #0x1E
-    bne 1f
-    str lr, sgLastNormalSwi
-    ldr r13, =sgLastSwiGuestLink
-    stmia r13, {lr}^
-    nop
-    // Read the SWI immediate only for a Thumb call in mapped low ROM.
-    mov r13, #0xFF
-    str r13, sgLastSwiOpcode
-    mrs r13, spsr
-    tst r13, #0x20
-    beq 1f
-    mov r13, lr, lsr #21
-    cmp r13, #0x11
-    bne 1f
-    ldrb r13, [lr, #-2]
-    str r13, sgLastSwiOpcode
-    cmp r13, #0x0B
-    bne 1f
-    // Record the original CpuSet arguments before entering the BIOS.
-    str r0, sgCpuSetSource
-    str r1, sgCpuSetDestination
-    str r2, sgCpuSetControl
-    mov r13, #0
-    str r13, sgCpuSetReturn
-1:
-    mov r13, #0
-    ldr pc, =vm_swiSoulgoldResume
-
-// FIQ-mode hook before the virtual mode switch. r8 = computed destination,
-// r12 = virtual SPSR, r10 = undefined instruction return address.
-// Only FIQ-banked scratch r10 is modified; r11 still holds old mode.
-.global sgTraceBiosExceptionReturn
-sgTraceBiosExceptionReturn:
-    stmdb sp!, {r10}
-    ldr r10, sgFaultCallStage
-    cmp r10, #0x1E
-    ldmia sp!, {r10}
-    streq r10, sgLastExceptionSource
-    streq r8, sgLastExceptionTarget
-    streq r12, sgLastExceptionSpsr
-    bne 2f
-    // Distinguish the BIOS SWI exit from ordinary IRQ returns.
-    stmdb sp!, {r10}
-    ldr r10, sgLastExceptionSource
-    // Compare source to relocated BIOS SWI exit using saved scratch.
-    stmdb sp!, {r11}
-    ldr r11, =gGbaBios + 0x18C
-    cmp r10, r11
-    ldmia sp!, {r11}
-    bne 1f
-    ldr r10, sgLastSwiOpcode
-    cmp r10, #0x0B
-    streq r8, sgCpuSetReturn
-1:
-    ldmia sp!, {r10}
-2:
-    bx lr
-
-// Capture the actual user-bank LR after the VM restores the destination mode.
-.global sgTraceRestoredGuestLink
-sgTraceRestoredGuestLink:
-    ldr r10, sgFaultCallStage
-    cmp r10, #0x1E
-    bne 1f
-    ldr r10, =sgRestoredGuestLink
-    stmia r10, {lr}^
-    nop
-1:
-    bx lr
-
 sgVblankWaitExit:
     str r0, sgTraceSavedR0
     ldr r13, =sgWaitExitLink
@@ -638,10 +543,10 @@ sgTraceInvalidFetch:
     ldr r13, =sgTraceFaultRegs
     stmia r13, {sp,lr}^
     nop
-    ldr r0, sgLastHicodeMiss
-    sg_hex 0x062042C4 // exact last high-ROM undefined miss PC
-    ldr r0, sgLastHicodeIndex
-    sg_hex 0x062042DC // cache debug index readback for that miss
+    ldr r0, sgTraceFaultRegs
+    sg_hex 0x062042C4 // live guest stack pointer
+    mrs r0, spsr
+    sg_hex 0x062042DC // actual interrupted CPU state
     ldr r0, sgLastHicodePrefetch
     sg_hex 0x06204544 // last high-ROM prefetch mapping PC
     ldr r0, sgTraceFaultRegs + 4
@@ -654,8 +559,8 @@ sgTraceInvalidFetch:
     orr r0, r0, r13, lsl #8
     ldr r13, sgFaultCallStage
     orr r0, r0, r13
-    orr r0, r0, #0x46000000
-    sg_hex 0x06204044 // 46 BB CC SS: build ID, BIOS phase, VM CPSR, stage
+    orr r0, r0, #0x49000000
+    sg_hex 0x06204044 // 49 BB CC SS: build ID, BIOS phase, VM CPSR, stage
 1:
     b 1b
 

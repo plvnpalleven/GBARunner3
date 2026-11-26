@@ -490,6 +490,9 @@ static void setupSoulgoldTraceDisplay()
                 }
                 tiles[(16 + digit) * 32 + y * 4 + pair] = packed;
             }
+    // Persistent experiment number, also visible before a terminal fault.
+    for (u32 digit = 0; digit < 8; ++digit)
+        map[0x44 / 2 + digit] = 16 + (digit == 0 ? 4 : digit == 1 ? 9 : 0);
     REG_BG0CNT_SUB = 0x0880; // 8bpp BG0, screen block 8
     REG_BG0HOFS_SUB = 0;
     REG_BG0VOFS_SUB = 0;

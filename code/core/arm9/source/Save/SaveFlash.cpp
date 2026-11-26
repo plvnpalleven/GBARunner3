@@ -530,39 +530,13 @@ static bool tryPatchSoulgold121()
         return false;
     }
 
-    // Trace SWIs execute in privileged mode and faithfully replace the
-    // guarded Thumb instructions (see SaveSwi.s). Earlier lights persist.
-    *(u16*)(rom + 0x5CB4) = 0xDF95; // return chip ID, mark slot 2
+    // Retain only functional compatibility hooks. All original main-loop,
+    // branch, callback, VBlank and ordinary startup instructions stay intact.
+    *(u16*)(rom + 0x5CB4) = 0xDF95; // return native Flash chip ID
     *(u16*)(rom + 0x5CB6) = 0x4770; // bx lr
-    *(u16*)(rom + 0x620E) = 0xDF96; // str r3,[r2], mark slot 3
-    *(u16*)(rom + 0x1A3D42) = 0xDF97; // ldr r3,[pc,#24], mark slot 4
-    *(u16*)(rom + 0x1A3D58) = 0xDF98; // branch after InitFlashTimer, slot 5
-    // Keep the proven cache-sync hook, trace subsequent graphics operations.
-    // Slot 7 now tracks the guest-side Flash-read epilogue.
-    *(u16*)(rom + 0x11F8A4) = 0xDF9B; // type 8: sync first copied routine (r11)
-    *(u16*)(rom + 0x11F8D6) = 0xDF9C; // type 8: sync second copied routine (r6)
-    *(u16*)(rom + 0x11FA52) = 0xDF9D; // cache synchronization before copied ARM call
-    *(u16*)(rom + 0x11FA5A) = 0xDF9E; // copied ARM routine returned
-    *(u16*)(rom + 0x1A70C2) = 0xDF9F; // main-loop callback load after read
-    *(u16*)(rom + 0x1A710A) = 0xDF9F; // alternate main-loop path
-
-    // Restore original callback return and branch instructions; observe
-    // only the post-transition decision and subsequent calls.
-    *(u16*)(rom + 0x1A709C) = 0xDF9F;
-    *(u16*)(rom + 0x1A70A2) = 0xDF9F;
-    *(u16*)(rom + 0x1A70A6) = 0xDF9F;
-    *(u16*)(rom + 0x1A70AA) = 0xDF9F;
-    *(u16*)(rom + 0x1A70B0) = 0xDF9F;
-    *(u16*)(rom + 0x1A70B4) = 0xDF9F;
-    *(u16*)(rom + 0x1A706E) = 0xDF9F;
-    *(u16*)(rom + 0x1A7072) = 0xDF9F;
-    *(u16*)(rom + 0x1A7076) = 0xDF9F;
-    *(u16*)(rom + 0x1A707C) = 0xDF9F;
-    *(u16*)(rom + 0x1A70E6) = 0xDF9F;
-    *(u16*)(rom + 0x1A70EA) = 0xDF9F;
-    // Keep the actual BIOS SWI 05 intact. Snapshot caller LR on both sides.
-    *(u16*)(rom + 0x308) = 0xDF9F;
-    *(u16*)(rom + 0x30C) = 0xDF9F;
+    *(u16*)(rom + 0x11F8A4) = 0xDF9B; // sync first copied ARM decoder
+    *(u16*)(rom + 0x11F8D6) = 0xDF9C; // sync second copied ARM decoder
+    *(u16*)(rom + 0x11FA52) = 0xDF9D; // sync copied ARM code before execution
 
     // The native setup table continues to point into the ROM, but the
     // actual Flash operations dispatch through GBARunner3's save hooks.
@@ -571,11 +545,9 @@ static bool tryPatchSoulgold121()
     sav_swiTable[2] = (void*)verifyFlashSector;
     sav_swiTable[3] = (void*)verifyFlash;
     // The guarded readSig also verifies the second Thumb halfword.
-    // First return to the guest Thumb epilogue, mark it via a second SWI,
-    // then execute BX LR back to the original game caller.
+    // Return directly to the guest caller without an extra trace SWI.
     *(u16*)(rom + 0x5F04) = 0xDF99;
-    *(u16*)(rom + 0x5F06) = 0xDF9A;
-    *(u16*)(rom + 0x5F08) = 0x4770;
+    *(u16*)(rom + 0x5F06) = 0x4770;
     *(u16*)(rom + 0x5FD8) = SAVE_THUMB_SWI(2);
     *(u16*)(rom + 0x607C) = SAVE_THUMB_SWI(3);
     *(u16*)(rom + 0x64A4) = SAVE_THUMB_SWI(8);

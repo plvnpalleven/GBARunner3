@@ -24,13 +24,7 @@ hicodeContinue:
         bhi patch_swiHandler // 0x80 and up
 #endif
 
-#ifndef GBAR3_TEST
-    b sgCheckVblankSwi
-#else
     mov r13, #0
-#endif
-.global vm_swiSoulgoldResume
-vm_swiSoulgoldResume:
 #ifdef GBAR3_HICODE_CACHE_MAPPING
     mcr	p15, 0, r13, c6, c4, 0 // disable mpu region
 #endif
@@ -104,14 +98,6 @@ hicodeLoadFromCache:
     moveq r13, r13, lsr #16
     and r13, r13, #0xFF
     b hicodeContinue
-#endif
-
-// Use unused mode-table padding; keep all fixed ITCM offsets unchanged.
-#ifndef GBAR3_TEST
-sgCheckVblankSwi:
-    ldr pc, sgVblankSwiHook
-sgVblankSwiHook:
-    .word sgTraceVblankBiosDispatch
 #endif
 
 .space 96 - (. - old_mode_4)
