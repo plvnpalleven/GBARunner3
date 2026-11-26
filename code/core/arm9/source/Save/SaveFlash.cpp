@@ -562,9 +562,54 @@ static bool tryPatchSoulgold121()
     return true;
 }
 
+// Experiment 050: exact original ROM signatures, including both high-ROM
+// functions and their literal pools. Failure leaves the 049 baseline intact.
+static void tryPatchSoulgoldIrqRng(FIL* romFile)
+{
+    u8* const rom = (u8*)ROM_LINEAR_DS_ADDRESS;
+    if (*(u16*)(rom + 0x1A6D94) != 0xF07C ||
+        *(u16*)(rom + 0x1A6D96) != 0xFB0A ||
+        *(u16*)(rom + 0x1A6D98) != 0xE7EA)
+        return;
+
+    static const u8 leaf[] = {
+        0x70,0xB4,0x0B,0x26,0x07,0x4D,0x1E,0xCD,
+        0x89,0x18,0x08,0x19,0x01,0x34,0x51,0x0A,
+        0x51,0x40,0xDA,0x00,0xD2,0x18,0xF3,0x41,
+        0x1B,0x18,0x10,0x3D,0x1E,0xC5,0x70,0xBC,
+        0x70,0x47,0x00,0x00,0x68,0x5A,0x00,0x03
+    };
+    static const u8 wrapper[] = {
+        0x00,0xB5,0x04,0x4B,0x1B,0x78,0x01,0x2B,
+        0x01,0xD0,0x01,0xBC,0x00,0x47,0xFF,0xF7,
+        0x71,0xFF,0xFA,0xE7,0x49,0x92,0x03,0x02
+    };
+    u8 buf[sizeof(leaf)];
+    UINT read = 0;
+    const auto oldPos = f_tell(romFile);
+    bool ok = f_lseek(romFile, 0x2232A0) == FR_OK &&
+        f_read(romFile, buf, sizeof(leaf), &read) == FR_OK &&
+        read == sizeof(leaf) && memcmp(buf, leaf, sizeof(leaf)) == 0;
+    if (ok)
+        ok = f_lseek(romFile, 0x2233AC) == FR_OK &&
+            f_read(romFile, buf, sizeof(wrapper), &read) == FR_OK &&
+            read == sizeof(wrapper) && memcmp(buf, wrapper, sizeof(wrapper)) == 0;
+    if (f_lseek(romFile, oldPos) != FR_OK || !ok)
+        return;
+
+    *(u16*)(rom + 0x1A6D94) = 0xDF9F;
+    *(u16*)(rom + 0x1A6D96) = 0x46C0;
+}
+
 bool flash_patch1MV103(const SaveTypeInfo* saveTypeInfo, FIL* romFile, u32 tagRomAddress, u8* tempBuffer)
 {
-    if (tryPatchSoulgold121() || tryPatchFlash1MV103Gcc())
+    if (tryPatchSoulgold121())
+    {
+        tryPatchSoulgoldIrqRng(romFile);
+        initializeFlash1M();
+        return true;
+    }
+    if (tryPatchFlash1MV103Gcc())
     {
         initializeFlash1M();
         return true;

@@ -15,7 +15,7 @@ arm_func sav_swiHandler
     cmp r13, #0x9E
         beq soulGoldTraceSecondReturn
     cmp r13, #0x9F
-        beq soulGoldTraceResourceReturn
+        beq sgIrqRngDispatch
     cmp r13, #0x95
         beq soulGoldTraceId
     cmp r13, #0x96
@@ -530,6 +530,60 @@ sgTraceVblankSample:
     bne 2b
     bx lr
 
+// Experiment 050: replace only the verified BL at the IRQ callsite.
+// The original wrapper tests a byte at 02039249, optionally advances the
+// four-word RNG state at 03005A68, then returns via the saved caller LR.
+// Preserve r4-r12, guest SP, and original result/flag semantics.
+sgIrqRngDispatch:
+    ldr r13, =0x023A6D96
+    cmp lr, r13
+    bne soulGoldTraceResourceReturn
+    add lr, lr, #2
+    ldr r13, =0x02039249
+    ldrb r3, [r13]
+    cmp r3, #1
+    beq sgIrqRngUpdate
+    mrs r0, cpsr
+    msr spsr_f, r0
+    mov r13, #1
+    str r13, sgFaultCallStage
+    orr r0, lr, #1
+    str r0, sgFaultGuestLink
+    ldr r13, =sgFaultGuestLink
+    ldmia r13, {lr}^
+    nop
+    movs pc, lr
+
+sgIrqRngUpdate:
+    mov r13, #2
+    str r13, sgFaultCallStage
+    ldr r13, =0x03005A68
+    ldmia r13!, {r0-r3}
+    add r0, r0, r1
+    add r0, r0, r3
+    add r3, r3, #1
+    eor r1, r1, r1, lsr #9
+    str r1, [r13, #-16]
+    add r1, r2, r2, lsl #3
+    str r1, [r13, #-12]
+    add r2, r0, r2, ror #11
+    str r2, [r13, #-8]
+    str r3, [r13, #-4]
+    mov r3, r2
+    mov r2, r1
+    ldr r1, [r13, #-16]
+    // Last flag-setting guest instruction was SUBS r5,#16.
+    mov r0, #0x20000000
+    msr spsr_f, r0
+    // The nested BL left the original guest LR pointing into the wrapper.
+    ldr r0, =0x082233BF
+    str r0, sgFaultGuestLink
+    ldr r13, =sgFaultGuestLink
+    ldmia r13, {lr}^
+    nop
+    orr r0, lr, #1
+    movs pc, lr
+
 // Terminal diagnostic in abort mode. IRQ/FIQ disabled; no stack needed.
 // LR was adjusted by memu_prefetchAbort to the faulting fetch address.
 .global sgTraceInvalidFetch
@@ -559,8 +613,8 @@ sgTraceInvalidFetch:
     orr r0, r0, r13, lsl #8
     ldr r13, sgFaultCallStage
     orr r0, r0, r13
-    orr r0, r0, #0x49000000
-    sg_hex 0x06204044 // 49 BB CC SS: build ID, BIOS phase, VM CPSR, stage
+    orr r0, r0, #0x50000000
+    sg_hex 0x06204044 // 50 BB CC SS: build ID, BIOS phase, VM CPSR, RNG stage
 1:
     b 1b
 
