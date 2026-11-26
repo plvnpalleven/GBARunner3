@@ -477,6 +477,18 @@ static bool tryPatchSoulgold121()
         *(u16*)(rom + 0x1A3D44) != 0x2800 ||
         *(u16*)(rom + 0x1A3D58) != 0xE7F8 ||
         *(u32*)(rom + 0x1A3D5C) != 0x030040BC ||
+        // Exact post-read callback observed on hardware (0x0814C92D).
+        *(u16*)(rom + 0x14C92C) != 0xB500 ||
+        *(u16*)(rom + 0x14C92E) != 0xF115 ||
+        *(u16*)(rom + 0x14C930) != 0xFC77 ||
+        *(u16*)(rom + 0x14C932) != 0xF100 ||
+        *(u16*)(rom + 0x14C934) != 0xFBF1 ||
+        *(u16*)(rom + 0x14C936) != 0xF102 ||
+        *(u16*)(rom + 0x14C938) != 0xF967 ||
+        *(u16*)(rom + 0x14C93A) != 0xF078 ||
+        *(u16*)(rom + 0x14C93C) != 0xFE13 ||
+        *(u16*)(rom + 0x14C93E) != 0xBC01 ||
+        *(u16*)(rom + 0x14C940) != 0x4700 ||
         *(u16*)(rom + 0x1A70C2) != 0x6863 ||
         *(u16*)(rom + 0x1A710A) != 0x6863 ||
         *(u16*)(rom + 0x11F8A4) != 0x4650 ||
@@ -512,6 +524,14 @@ static bool tryPatchSoulgold121()
     *(u16*)(rom + 0x11FA5A) = 0xDF9E; // copied ARM routine returned
     *(u16*)(rom + 0x1A70C2) = 0xDF9F; // main-loop callback load after read
     *(u16*)(rom + 0x1A710A) = 0xDF9F; // alternate main-loop path
+    // Share trace opcode with the callback counter. Dispatch by the
+    // exception return address. Reproduce the first Thumb BL half;
+    // the original second half remains intact.
+    *(u16*)(rom + 0x14C92E) = 0xDF9F;
+    *(u16*)(rom + 0x14C932) = 0xDF9F;
+    *(u16*)(rom + 0x14C936) = 0xDF9F;
+    *(u16*)(rom + 0x14C93A) = 0xDF9F;
+    *(u16*)(rom + 0x14C940) = 0xDF9F; // final BX r0
 
     // The native setup table continues to point into the ROM, but the
     // actual Flash operations dispatch through GBARunner3's save hooks.

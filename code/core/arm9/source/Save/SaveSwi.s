@@ -302,6 +302,19 @@ soulGoldTraceSecondReturn:
     movs pc, lr
 
 soulGoldTraceResourceReturn:
+    // Distinct low bytes for all seven guarded SWI sites, unchanged by
+    // the linear ROM alias. Preserve guest flags through SPSR.
+    and r13, lr, #0xFF
+    cmp r13, #0x30
+    beq sgCallbackCall1
+    cmp r13, #0x34
+    beq sgCallbackCall2
+    cmp r13, #0x38
+    beq sgCallbackCall3
+    cmp r13, #0x3C
+    beq sgCallbackCall4
+    cmp r13, #0x42
+    beq sgCallbackExit
     // Original 0x6863: LDR r3,[r4,#4]. Record only after guest epilogue.
     ldr r3, [r4, #4]
     str r0, sgTraceSavedR0
@@ -331,7 +344,56 @@ soulGoldTraceResourceReturn:
 1:
     movs pc, lr
 
+// Display call number at bottom right, retaining existing hex counters.
+// ARM7 Thumb BL prefix sets guest LR = instruction address+4+imm11*4096.
+// SWI LR is instruction address+2. Write the user-bank LR, leaving
+// the original BL suffix to branch and set its normal return address.
+.macro sg_callback_prefix stage, offset
+    str r0, sgTraceHexSavedR0
+    str r12, sgTraceHexSavedR12
+    mov r0, #\stage
+    sg_hex 0x0620455C
+    ldr r13, =\offset
+    add r0, lr, #2
+    add r0, r0, r13
+    str r0, sgTraceGuestLink
+    ldr r13, =sgTraceGuestLink
+    ldmia r13, {lr}^
+    nop
+    ldr r12, sgTraceHexSavedR12
+    ldr r0, sgTraceHexSavedR0
+    movs pc, lr
+.endm
+
+sgCallbackCall1:
+    sg_callback_prefix 1, 0x115000
+sgCallbackCall2:
+    sg_callback_prefix 2, 0x100000
+sgCallbackCall3:
+    sg_callback_prefix 3, 0x102000
+sgCallbackCall4:
+    sg_callback_prefix 4, 0x078000
+sgCallbackExit:
+    str r0, sgTraceHexSavedR0
+    str r12, sgTraceHexSavedR12
+    mov r0, #5
+    sg_hex 0x0620455C
+    ldr r12, sgTraceHexSavedR12
+    ldr r0, sgTraceHexSavedR0
+    // Emulate BX r0, including ARM/Thumb state.
+    mov lr, r0
+    mrs r13, spsr
+    bic r13, r13, #0x20
+    tst lr, #1
+    orrne r13, r13, #0x20
+    msr spsr_c, r13
+    bic lr, lr, #1
+    biceq lr, lr, #2
+    movs pc, lr
+
 .balign 4
+sgTraceGuestLink:
+    .word 0
 sgTraceSavedR0:
     .word 0
 sgTraceHexSavedR0:
