@@ -573,8 +573,22 @@ sgVerifyMixerCopy:
     add r2, r2, #4
     cmp r2, r3
     blo 1b
-    // Experiment 057: original mixer, with the ROM mirror mapping fix.
-    // Keep the verified RAM copy and cache maintenance; do not bypass mixing.
+    // Experiment 058: retain the mixer but choose its existing direct
+    // sample-read path rather than the optional uncompressed stack copy.
+    // Original ROM 0828FDBC / IWRAM 03001588: BHS 0300161C.
+    // The original fallback keeps the two saved words on the stack
+    // and reads from r3 directly. No audio channels are disabled.
+    ldr r2, =0x03001588
+    ldr r0, [r2]
+    ldr r12, =0x2A000023
+    cmp r0, r12
+    bne 4f
+    ldr r0, =0xEA000023
+    str r0, [r2]
+    ldr r13, sgFaultCallStage
+    add r13, r13, #2
+    str r13, sgFaultCallStage
+4:
     ldr r2, =0x030011C0
     ldr r3, =0x03001D20
 2:
@@ -591,7 +605,7 @@ sgVerifyMixerCopy:
     cmp r2, r3
     blo 3b
     ldr r0, sgFaultCallStage
-    orr r0, r0, #0x57000000
+    orr r0, r0, #0x58000000
     sg_hex 0x06204044
     ldr r1, sgMixerSavedR1
     ldr r2, sgMixerSavedR2
@@ -629,8 +643,8 @@ sgTraceInvalidFetch:
     orr r0, r0, r13, lsl #8
     ldr r13, sgFaultCallStage
     orr r0, r0, r13
-    orr r0, r0, #0x57000000
-    sg_hex 0x06204044 // 57 BB CC SS: build ID, BIOS phase, VM CPSR, copy status
+    orr r0, r0, #0x58000000
+    sg_hex 0x06204044 // 58 BB CC SS: build ID, BIOS phase, VM CPSR, copy status
 1:
     b 1b
 
