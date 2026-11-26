@@ -66,6 +66,9 @@ vm_armUndefinedAluSPCImm:
     adr r11, 2f
     bx lr // call mode switch function
 2:
+#ifndef GBAR3_TEST
+    bl sgTraceRestoredGuestLink
+#endif
     push {r12}
     bl emu_updateIrqs
 

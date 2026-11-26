@@ -499,7 +499,22 @@ sgTraceVblankBiosDispatch:
     streq r13, sgFaultCallStage
     ldr r13, sgFaultCallStage
     cmp r13, #0x1E
-    streq lr, sgLastNormalSwi
+    bne 1f
+    str lr, sgLastNormalSwi
+    ldr r13, =sgLastSwiGuestLink
+    stmia r13, {lr}^
+    nop
+    // Read the SWI immediate only for a Thumb call in mapped low ROM.
+    mov r13, #0xFF
+    str r13, sgLastSwiOpcode
+    mrs r13, spsr
+    tst r13, #0x20
+    beq 1f
+    mov r13, lr, lsr #21
+    cmp r13, #0x11
+    bne 1f
+    ldrb r13, [lr, #-2]
+    str r13, sgLastSwiOpcode
 1:
     mov r13, #0
     ldr pc, =vm_swiSoulgoldResume
@@ -509,11 +524,25 @@ sgTraceVblankBiosDispatch:
 // Only FIQ-banked scratch r10 is modified; r11 still holds old mode.
 .global sgTraceBiosExceptionReturn
 sgTraceBiosExceptionReturn:
-    str r10, sgLastExceptionSource
+    stmdb sp!, {r10}
     ldr r10, sgFaultCallStage
     cmp r10, #0x1E
+    ldmia sp!, {r10}
+    streq r10, sgLastExceptionSource
     streq r8, sgLastExceptionTarget
     streq r12, sgLastExceptionSpsr
+    bx lr
+
+// Capture the actual user-bank LR after the VM restores the destination mode.
+.global sgTraceRestoredGuestLink
+sgTraceRestoredGuestLink:
+    ldr r10, sgFaultCallStage
+    cmp r10, #0x1E
+    bne 1f
+    ldr r10, =sgRestoredGuestLink
+    stmia r10, {lr}^
+    nop
+1:
     bx lr
 
 sgVblankWaitExit:
@@ -585,14 +614,14 @@ sgTraceInvalidFetch:
     ldr r13, =sgTraceFaultRegs
     stmia r13, {sp,lr}^
     nop
-    ldr r0, sgLastExceptionTarget
-    sg_hex 0x062042C4 // computed virtual exception return target
+    ldr r0, sgRestoredGuestLink
+    sg_hex 0x062042C4 // user LR just after virtual mode restoration
     ldr r0, sgLastExceptionSource
     sg_hex 0x062042DC // return instruction address + 4
     ldr r0, sgLastNormalSwi
     sg_hex 0x06204544 // last normal SWI return address
-    ldr r0, sgLastExceptionSpsr
-    sg_hex 0x0620455C // virtual SPSR for the recorded return
+    ldr r0, sgLastSwiGuestLink
+    sg_hex 0x0620455C // user LR at last ordinary SWI entry
     ldr r13, =memu_biosOpcodeId
     ldrb r0, [r13]
     mov r0, r0, lsl #16
@@ -601,11 +630,19 @@ sgTraceInvalidFetch:
     orr r0, r0, r13, lsl #8
     ldr r13, sgFaultCallStage
     orr r0, r0, r13
-    sg_hex 0x06204044 // 00 BB CC SS: BIOS opcode ID, virtual CPSR, stage
+    ldr r13, sgLastSwiOpcode
+    orr r0, r0, r13, lsl #24
+    sg_hex 0x06204044 // OO BB CC SS: SWI immediate, BIOS phase, VM CPSR, stage
 1:
     b 1b
 
 .balign 4
+sgLastSwiOpcode:
+    .word 0xFF
+sgLastSwiGuestLink:
+    .word 0
+sgRestoredGuestLink:
+    .word 0
 sgLastNormalSwi:
     .word 0
 sgLastExceptionTarget:
