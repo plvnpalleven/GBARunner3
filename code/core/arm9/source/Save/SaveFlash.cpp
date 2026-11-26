@@ -452,15 +452,14 @@ static bool tryPatchSoulgold121()
     sav_swiTable[1] = (void*)readFlash;
     sav_swiTable[2] = (void*)verifyFlashSector;
     sav_swiTable[3] = (void*)verifyFlash;
-    // DIAGNOSTIC ONLY: bypass the SWI handler completely.
-    // 0x2000 = movs r0, #0; 0x4770 = bx lr (Thumb).
-    // This reports Flash identification success without setting up any
-    // Flash chip function pointers. Do NOT use for real gameplay/saves.
-    // Other read/verify entrypoints remain untouched.
-    *(u16*)(rom + 0x61B0) = 0x2000;
-    *(u16*)(rom + 0x61B2) = 0x4770;
+    // CONTROL: same direct-return patch as experiment 009, but return
+    // failure (1) so the game SHOULD display its original Flash error.
+    // This verifies that our address really is IdentifyFlash's entry.
+    // No Flash pointers are configured, so this is not a playable build.
+    *(u16*)(rom + 0x61B0) = 0x2001; // movs r0, #1
+    *(u16*)(rom + 0x61B2) = 0x4770; // bx lr
     sSoulgoldRuntimeProbeEnabled = false;
-    GFX_PLTT_BG_SUB[0] = 0x7C00; // blue: direct-return test applied
+    GFX_PLTT_BG_SUB[0] = 0x7C00; // blue: failure-control patch installed
     return true;
 }
 
