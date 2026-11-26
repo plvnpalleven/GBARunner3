@@ -5,17 +5,17 @@
 
 arm_func sav_swiHandler
     cmp r13, #0x9A
-        beq soulGoldTraceLoop
+        beq soulGoldTracePalette
     cmp r13, #0x9B
-        beq soulGoldTraceCallback
+        beq soulGoldTraceReset
     cmp r13, #0x9C
-        beq soulGoldTraceScreen
+        beq soulGoldTraceResource1
     cmp r13, #0x9D
-        beq soulGoldTraceClear
+        beq soulGoldTraceResource2
     cmp r13, #0x9E
-        beq soulGoldTraceGraphics
+        beq soulGoldTraceAfterResources
     cmp r13, #0x9F
-        beq soulGoldTraceFrame
+        beq soulGoldTraceGraphicsDone
     cmp r13, #0x95
         beq soulGoldTraceId
     cmp r13, #0x96
@@ -179,59 +179,44 @@ soulGoldTraceRead:
     mov r13, #0x81 // proceed with original readFlash SWI dispatch
     b sav_swiHandler
 
-// Preserve exact original instruction effects, including condition flags.
-soulGoldTraceLoop:
-    ldr r3, =0x030040C0
+// Reproduce original literal loads, preserving guest flags and registers.
+soulGoldTracePalette:
+    ldr r1, =0x05000002
     sg_trace_mark 7, 0x7FE0
     movs pc, lr
 
-soulGoldTraceCallback:
-    ldr r3, [r4, #4]
-    // Keep the first callback result; later frames cannot overwrite it.
+soulGoldTraceReset:
+    ldr r3, =0x02038318
+    // This helper may be used elsewhere; only record after slot 7.
     str r0, sgTraceSavedR0
-    ldr r13, =0x05000410
+    ldr r13, =0x0500040E
     ldrh r0, [r13]
-    ldr r13, =0x2108
+    ldr r13, =0x7FE0
     cmp r0, r13
     ldr r0, sgTraceSavedR0
-    bne 3f
-    cmp r3, #0
-    beq 1f
-    ldr r13, =0x0818B7F1
-    cmp r3, r13
-    bne 2f
+    bne 1f
     sg_trace_mark 8, 0x03FF
-    movs pc, lr
 1:
-    sg_trace_mark 8, 0x001F
-    movs pc, lr
-2:
-    sg_trace_mark 8, 0x7C1F
-3:
     movs pc, lr
 
-soulGoldTraceScreen:
-    ldr r5, =0x030055C0
+soulGoldTraceResource1:
+    ldr r0, =0x0868028C
     sg_trace_mark 9, 0x03E0
     movs pc, lr
 
-soulGoldTraceClear:
-    ldr r2, =0x010001FF
+soulGoldTraceResource2:
+    ldr r0, =0x086801C4
     sg_trace_mark 10, 0x7C1F
     movs pc, lr
 
-soulGoldTraceGraphics:
-    ldr r3, =0x0000FFFF
+soulGoldTraceAfterResources:
+    ldr r0, =0x0868054C
     sg_trace_mark 11, 0x01FF
     movs pc, lr
 
-soulGoldTraceFrame:
+soulGoldTraceGraphicsDone:
+    ldr r3, =0x0000FFFF
     sg_trace_mark 12, 0x7C00
-    // Original branches both target 0x081A700C.
-    // LR ends in 0x8C or 0xEC in either ROM mapping.
-    tst lr, #0x40
-    subeq lr, lr, #128
-    subne lr, lr, #224
     movs pc, lr
 
 .balign 4

@@ -477,19 +477,18 @@ static bool tryPatchSoulgold121()
         *(u16*)(rom + 0x1A3D44) != 0x2800 ||
         *(u16*)(rom + 0x1A3D58) != 0xE7F8 ||
         *(u32*)(rom + 0x1A3D5C) != 0x030040BC ||
-        *(u16*)(rom + 0x1A6FF6) != 0x4B4B ||
-        *(u32*)(rom + 0x1A7124) != 0x030040C0 ||
-        *(u16*)(rom + 0x1A70C2) != 0x6863 ||
-        *(u16*)(rom + 0x1A710A) != 0x6863 ||
-        *(u32*)(rom + 0x1A7274) != 0x0818B7F1 ||
-        *(u16*)(rom + 0x18B524) != 0x4D6A ||
-        *(u32*)(rom + 0x18B6D0) != 0x030055C0 ||
-        *(u16*)(rom + 0x18B5F2) != 0x4A3C ||
-        *(u32*)(rom + 0x18B6E4) != 0x010001FF ||
+        *(u16*)(rom + 0x18B5F6) != 0x493C ||
+        *(u32*)(rom + 0x18B6E8) != 0x05000002 ||
+        *(u16*)(rom + 0x1C4F5A) != 0x4B07 ||
+        *(u32*)(rom + 0x1C4F78) != 0x02038318 ||
+        *(u16*)(rom + 0x18B604) != 0x4839 ||
+        *(u32*)(rom + 0x18B6EC) != 0x0868028C ||
+        *(u16*)(rom + 0x18B60C) != 0x4838 ||
+        *(u32*)(rom + 0x18B6F0) != 0x086801C4 ||
+        *(u16*)(rom + 0x18B618) != 0x4837 ||
+        *(u32*)(rom + 0x18B6F8) != 0x0868054C ||
         *(u16*)(rom + 0x18B630) != 0x4B32 ||
-        *(u32*)(rom + 0x18B6FC) != 0x0000FFFF ||
-        *(u16*)(rom + 0x1A708A) != 0xE7BF ||
-        *(u16*)(rom + 0x1A70EA) != 0xE78F)
+        *(u32*)(rom + 0x18B6FC) != 0x0000FFFF)
     {
         return false;
     }
@@ -501,16 +500,13 @@ static bool tryPatchSoulgold121()
     *(u16*)(rom + 0x620E) = 0xDF96; // str r3,[r2], mark slot 3
     *(u16*)(rom + 0x1A3D42) = 0xDF97; // ldr r3,[pc,#24], mark slot 4
     *(u16*)(rom + 0x1A3D58) = 0xDF98; // branch after InitFlashTimer, slot 5
-    // First-frame markers. Preserve top row, replace the startup row.
-    // All instructions and literal targets checked against the exact ROM.
-    *(u16*)(rom + 0x1A6FF6) = 0xDF9A; // main loop prologue
-    *(u16*)(rom + 0x1A70C2) = 0xDF9B; // load callback2 (path 1)
-    *(u16*)(rom + 0x1A710A) = 0xDF9B; // load callback2 (path 2)
-    *(u16*)(rom + 0x18B524) = 0xDF9C; // initial screen callback helper
-    *(u16*)(rom + 0x18B5F2) = 0xDF9D; // two VRAM/OAM clear calls returned
-    *(u16*)(rom + 0x18B630) = 0xDF9E; // initial graphics setup reached
-    *(u16*)(rom + 0x1A708A) = 0xDF9F; // frame wait finished (flag)
-    *(u16*)(rom + 0x1A70EA) = 0xDF9F; // frame wait finished (BIOS)
+    // Graphics subtrace: verified Thumb literal loads in the exact ROM.
+    *(u16*)(rom + 0x18B5F6) = 0xDF9A; // before palette fill
+    *(u16*)(rom + 0x1C4F5A) = 0xDF9B; // palette fill returned, reset helper entered
+    *(u16*)(rom + 0x18B604) = 0xDF9C; // reset helper returned, first resource
+    *(u16*)(rom + 0x18B60C) = 0xDF9D; // first resource returned
+    *(u16*)(rom + 0x18B618) = 0xDF9E; // second resource returned
+    *(u16*)(rom + 0x18B630) = 0xDF9F; // remaining graphics setup returned
 
     // The native setup table continues to point into the ROM, but the
     // actual Flash operations dispatch through GBARunner3's save hooks.
