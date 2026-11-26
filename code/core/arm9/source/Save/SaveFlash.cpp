@@ -558,7 +558,6 @@ static bool tryPatchSoulgold121()
     // No runtime writes to restricted hardware display registers.
     sSoulgoldRuntimeProbeEnabled = false;
     gSoulgoldTraceEnabled = 1;
-    GFX_PLTT_BG_SUB[0] = 0x7FE0; // cyan during splash; grid after splash
     return true;
 }
 

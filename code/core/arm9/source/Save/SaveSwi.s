@@ -147,11 +147,7 @@ thumb_func sav_flushSaveFileFromUserMode
 .arm
 .balign 4
 .macro sg_trace_mark slot, color
-    str r0, sgTraceSavedR0
-    ldr r13, =0x05000400 + (2 * \slot)
-    ldr r0, =\color
-    strh r0, [r13]
-    ldr r0, sgTraceSavedR0
+    // No SUB palette writes while the SUB engine displays the captured game.
 .endm
 
 soulGoldTraceId:
@@ -581,9 +577,7 @@ sgVerifyMixerCopy:
     add r2, r2, #32
     cmp r2, r3
     blo 3b
-    ldr r0, sgFaultCallStage
-    orr r0, r0, #0x53000000
-    sg_hex 0x06204044
+    // Keep copy status in host memory, without touching capture VRAM.
     ldr r1, sgMixerSavedR1
     ldr r2, sgMixerSavedR2
     ldr r3, sgMixerSavedR3
@@ -596,32 +590,8 @@ sgVerifyMixerCopy:
 .global sgTraceInvalidFetch
 sgTraceInvalidFetch:
     msr cpsr_c, #0xD7
-    ldr r13, =0x05000402
-    mov r0, #0x001F
-    strh r0, [r13] // tile 1 red: invalid fetch captured
-    mov r0, lr
-    sg_hex 0x0620405C // exact faulting fetch address
-    ldr r13, =sgTraceFaultRegs
-    stmia r13, {sp,lr}^
-    nop
-    ldr r0, sgTraceFaultRegs
-    sg_hex 0x062042C4 // live guest stack pointer
-    mrs r0, spsr
-    sg_hex 0x062042DC // actual interrupted CPU state
-    ldr r0, sgLastHicodePrefetch
-    sg_hex 0x06204544 // last high-ROM prefetch mapping PC
-    ldr r0, sgTraceFaultRegs + 4
-    sg_hex 0x0620455C // live guest LR at invalid fetch
-    ldr r13, =memu_biosOpcodeId
-    ldrb r0, [r13]
-    mov r0, r0, lsl #16
-    ldr r13, =vm_cpsr
-    ldrb r13, [r13]
-    orr r0, r0, r13, lsl #8
-    ldr r13, sgFaultCallStage
-    orr r0, r0, r13
-    orr r0, r0, #0x53000000
-    sg_hex 0x06204044 // 53 BB CC SS: build ID, BIOS phase, VM CPSR, copy status
+    // Normal capture owns SUB VRAM. Do not overwrite its contents.
+    // Hardware testing of 054 is visual only; 053 retains the debug panel.
 1:
     b 1b
 

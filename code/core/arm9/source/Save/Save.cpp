@@ -179,7 +179,6 @@ static u8 sSoulgoldReadBuffer[512];
 
 extern "C" void sav_readSoulgoldFlashBlock(u32 secNo, u32 offset, u8* dst, u32 size)
 {
-    volatile u16* const marker = (volatile u16*)0x0500040C;
     const u32 address = (u32)dst;
     const bool ewram = address >= 0x02000000 && address < 0x02040000
         && size <= 0x02040000 - address;
@@ -189,16 +188,13 @@ extern "C" void sav_readSoulgoldFlashBlock(u32 secNo, u32 offset, u8* dst, u32 s
     if (!(ewram || iwram) || (secNo & 0xFFFF) >= 32 ||
         offset > flashSize - ((secNo & 0xFFFF) << 12))
     {
-        *marker = 0x7C1F; // magenta: unexpected arguments
         return;
     }
     const u32 start = ((secNo & 0xFFFF) << 12) + offset;
     if (size > flashSize - start)
     {
-        *marker = 0x7C1F;
         return;
     }
-    *marker = 0x03FF; // yellow: starting read
     vm_enableNestedIrqs();
     bool ok = true;
     if (Environment::IsIsNitroEmulator())
@@ -229,7 +225,6 @@ extern "C" void sav_readSoulgoldFlashBlock(u32 secNo, u32 offset, u8* dst, u32 s
             memset(dst, SAVE_DATA_FILL, remaining);
     }
     vm_disableNestedIrqs();
-    *marker = ok ? 0x03E0 : 0x001F; // green: complete, red: I/O error
 }
 
 extern "C" u8 sav_readSaveByteFromFile(u32 saveAddress)

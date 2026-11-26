@@ -4,12 +4,7 @@
 #include "AsmMacros.inc"
 
 arm_func emu_vblankIrq
-    // SoulGold diagnostic owns VRAM C as a SUB tile BG. Do not remap
-    // C/D or start capture during its boot. Keep ordinary DMA/save checks.
-    ldr r13, =gSoulgoldTraceEnabled
-    ldrb r13, [r13]
-    cmp r13, #0
-    bne emu_vblankDmaJumpInstruction
+    // Restore ordinary display capture for the centered game image.
     // For center and mask display capture has to be enabled every frame
     // and the buffers need to be swapped
 jumpToCaptureUpdate:
