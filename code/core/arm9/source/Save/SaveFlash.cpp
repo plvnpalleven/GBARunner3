@@ -476,7 +476,17 @@ static bool tryPatchSoulgold121()
         *(u16*)(rom + 0x1A3D42) != 0x4B06 ||
         *(u16*)(rom + 0x1A3D44) != 0x2800 ||
         *(u16*)(rom + 0x1A3D58) != 0xE7F8 ||
-        *(u32*)(rom + 0x1A3D5C) != 0x030040BC)
+        *(u32*)(rom + 0x1A3D5C) != 0x030040BC ||
+        *(u16*)(rom + 0x1A7184) != 0x4B3A ||
+        *(u32*)(rom + 0x1A7270) != 0x0203E140 ||
+        *(u16*)(rom + 0x1A71B6) != 0x4680 ||
+        *(u16*)(rom + 0x1A721A) != 0x481B ||
+        *(u32*)(rom + 0x1A7288) != 0x0201B11C ||
+        *(u16*)(rom + 0x1A7230) != 0x4A16 ||
+        *(u32*)(rom + 0x1A728C) != 0x030040BC ||
+        *(u16*)(rom + 0x1A724C) != 0x646F ||
+        *(u16*)(rom + 0x1A6FF6) != 0x4B4B ||
+        *(u32*)(rom + 0x1A7124) != 0x030040C0)
     {
         return false;
     }
@@ -488,6 +498,14 @@ static bool tryPatchSoulgold121()
     *(u16*)(rom + 0x620E) = 0xDF96; // str r3,[r2], mark slot 3
     *(u16*)(rom + 0x1A3D42) = 0xDF97; // ldr r3,[pc,#24], mark slot 4
     *(u16*)(rom + 0x1A3D58) = 0xDF98; // branch after InitFlashTimer, slot 5
+    // Further startup markers. Exact instructions and literal targets above
+    // verified against SHA256 355fd4271330bddefcd8bda4f6d34dcc188ff27db8d57f1a69aafc043366d387.
+    *(u16*)(rom + 0x1A7184) = 0xDF9A; // CheckForFlashMemory returned
+    *(u16*)(rom + 0x1A71B6) = 0xDF9B; // RTC calls returned
+    *(u16*)(rom + 0x1A721A) = 0xDF9C; // post-RTC initialization reached
+    *(u16*)(rom + 0x1A7230) = 0xDF9D; // accuracy-check path returned
+    *(u16*)(rom + 0x1A724C) = 0xDF9E; // about to enter main loop
+    *(u16*)(rom + 0x1A6FF6) = 0xDF9F; // main loop prologue reached
 
     // The native setup table continues to point into the ROM, but the
     // actual Flash operations dispatch through GBARunner3's save hooks.

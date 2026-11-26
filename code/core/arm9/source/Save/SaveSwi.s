@@ -4,6 +4,18 @@
 #include "AsmMacros.inc"
 
 arm_func sav_swiHandler
+    cmp r13, #0x9A
+        beq soulGoldTracePostFlash
+    cmp r13, #0x9B
+        beq soulGoldTraceRtc
+    cmp r13, #0x9C
+        beq soulGoldTracePostRtc
+    cmp r13, #0x9D
+        beq soulGoldTraceAccuracy
+    cmp r13, #0x9E
+        beq soulGoldTracePreLoop
+    cmp r13, #0x9F
+        beq soulGoldTraceLoop
     cmp r13, #0x95
         beq soulGoldTraceId
     cmp r13, #0x96
@@ -166,6 +178,37 @@ soulGoldTraceRead:
     sg_trace_mark 6, 0x7C00
     mov r13, #0x81 // proceed with original readFlash SWI dispatch
     b sav_swiHandler
+
+// Preserve exact original instruction effects, including condition flags.
+soulGoldTracePostFlash:
+    ldr r3, =0x0203E140
+    sg_trace_mark 7, 0x7FE0
+    movs pc, lr
+
+soulGoldTraceRtc:
+    mov r8, r0
+    sg_trace_mark 8, 0x03FF
+    movs pc, lr
+
+soulGoldTracePostRtc:
+    ldr r0, =0x0201B11C
+    sg_trace_mark 9, 0x03E0
+    movs pc, lr
+
+soulGoldTraceAccuracy:
+    ldr r2, =0x030040BC
+    sg_trace_mark 10, 0x7C1F
+    movs pc, lr
+
+soulGoldTracePreLoop:
+    str r7, [r5, #0x44]
+    sg_trace_mark 11, 0x01FF
+    movs pc, lr
+
+soulGoldTraceLoop:
+    ldr r3, =0x030040C0
+    sg_trace_mark 12, 0x7C00
+    movs pc, lr
 
 .balign 4
 sgTraceSavedR0:

@@ -444,17 +444,17 @@ static void setupSoulgoldTraceDisplay()
     mem_setVramCMapping(MEM_VRAM_C_SUB_BG_00000);
     volatile u16* const tiles = (volatile u16*)0x06200000;
     volatile u16* const map = (volatile u16*)0x06204000;
-    for (u32 tile = 0; tile <= 6; ++tile)
+    for (u32 tile = 0; tile <= 12; ++tile)
         for (u32 i = 0; i < 32; ++i)
             tiles[tile * 32 + i] = tile | (tile << 8);
     for (u32 i = 0; i < 1024; ++i)
         map[i] = 0;
-    for (u32 stage = 0; stage < 6; ++stage)
-        for (u32 y = 9; y < 15; ++y)
+    for (u32 stage = 0; stage < 12; ++stage)
+        for (u32 y = 0; y < 6; ++y)
             for (u32 x = 0; x < 4; ++x)
-                map[y * 32 + 1 + stage * 5 + x] = stage + 1;
+                map[(y + 4 + (stage / 6) * 10) * 32 + 1 + (stage % 6) * 5 + x] = stage + 1;
     GFX_PLTT_BG_SUB[0] = 0;
-    for (u32 i = 1; i <= 6; ++i)
+    for (u32 i = 1; i <= 12; ++i)
         GFX_PLTT_BG_SUB[i] = 0x2108; // gray: not reached
     GFX_PLTT_BG_SUB[1] = 0x7FE0; // cyan: patch installed
     REG_BG0CNT_SUB = 0x0880; // 8bpp BG0, screen block 8
