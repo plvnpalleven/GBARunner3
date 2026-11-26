@@ -438,7 +438,23 @@ sgFrameWait:
     sg_post_stage 0x19
     movs pc, lr
 sgWaitCall:
-    sg_transition_prefix 0x1A, 0x1A7000, 1
+    // The guarded F659 F90F pair at 081A70E6 is BL 08000308.
+    // Emulate BOTH halfwords instead of executing an orphan BL suffix.
+    // SWI LR points at 081A70E8; guest LR must become 081A70EB.
+    sg_post_stage 0x1A
+    str r0, sgTraceSavedR0
+    add r0, lr, #2
+    orr r0, r0, #1
+    str r0, sgFaultGuestLink
+    ldr r13, =sgFaultGuestLink
+    ldmia r13, {lr}^
+    nop
+    // Compute destination relative to the actual exception return address.
+    ldr r13, =0x1A6DE0
+    sub lr, lr, r13
+    str lr, sgFaultReturnTarget
+    ldr r0, sgTraceSavedR0
+    movs pc, lr
 sgWaitReturn:
     sg_post_stage 0x1B
     sub lr, lr, #0xE0 // 1A70EC -> 1A700C
