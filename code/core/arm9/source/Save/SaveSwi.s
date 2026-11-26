@@ -185,14 +185,49 @@ soulGoldTraceResourceOne:
     sg_trace_mark 7, 0x7FE0
     movs pc, lr
 
+// Type-8 decoder copies 0x284 and 0x118 bytes of ARM code to IWRAM.
+// Only invalidate the aligned lines intersecting the verified copy.
+// Uses r0 and banked r13 as scratch; guest r0 is reconstructed below.
+.macro sg_type8_sync target, size, slot, color
+    mov r0, \target
+    tst r0, #3
+    bne 8f
+    mov r13, r0, lsr #24
+    cmp r13, #3
+    bne 8f
+    ldr r13, =\size
+    add r13, r0, r13
+    cmp r13, #0x04000000
+    bhi 8f
+    bic r0, r0, #31
+    mcr p15, 0, r0, c7, c10, 4
+7:
+    mcr p15, 0, r0, c7, c5, 1
+    add r0, r0, #32
+    cmp r0, r13
+    blo 7b
+    sg_trace_mark \slot, \color
+    b 9f
+8:
+    sg_trace_mark \slot, 0x001F
+9:
+.endm
+
 soulGoldTraceResourceTwo:
-    ldr r0, =0x0868054C
-    sg_trace_mark 8, 0x03FF
+    sg_type8_sync r11, 0x284, 8, 0x03FF
+    mov r0, r10 // original high-register MOV; flags unchanged
     movs pc, lr
 
 soulGoldTraceGraphicsSetup:
-    ldr r3, =0x0000FFFF
-    sg_trace_mark 9, 0x03E0
+    sg_type8_sync r6, 0x118, 9, 0x03E0
+    mov r0, r5
+    // Original 0x0028 is LSLS r0,r5,#0 (MOVS alias): update N/Z only.
+    mrs r13, spsr
+    bic r13, r13, #0xC0000000
+    cmp r0, #0
+    orreq r13, r13, #0x40000000
+    orrmi r13, r13, #0x80000000
+    msr spsr_f, r13
     movs pc, lr
 
 soulGoldTraceSecondCall:
@@ -239,7 +274,7 @@ soulGoldTraceSecondReturn:
     movs pc, lr
 
 soulGoldTraceResourceReturn:
-    ldr r4, =0x03002F78
+    ldr r0, =0x0868054C
     sg_trace_mark 12, 0x7C00
     movs pc, lr
 

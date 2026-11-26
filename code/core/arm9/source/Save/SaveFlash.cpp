@@ -479,10 +479,14 @@ static bool tryPatchSoulgold121()
         *(u32*)(rom + 0x1A3D5C) != 0x030040BC ||
         *(u16*)(rom + 0x18B618) != 0x4837 ||
         *(u32*)(rom + 0x18B6F8) != 0x0868054C ||
-        *(u16*)(rom + 0x18B630) != 0x4B32 ||
-        *(u32*)(rom + 0x18B6FC) != 0x0000FFFF ||
-        *(u16*)(rom + 0x18B666) != 0x4C1B ||
-        *(u32*)(rom + 0x18B6D4) != 0x03002F78 ||
+        *(u16*)(rom + 0x11F8A4) != 0x4650 ||
+        *(u16*)(rom + 0x11F8D6) != 0x0028 ||
+        *(u32*)(rom + 0x11F8F0) != 0x0811F624 ||
+        *(u32*)(rom + 0x11F8F4) != 0x0811F3A0 ||
+        *(u32*)(rom + 0x11F8F8) != 0x0811F744 ||
+        *(u32*)(rom + 0x11F8FC) != 0x0811F62C ||
+        *(u16*)(rom + 0x120394) != 0x4758 ||
+        *(u16*)(rom + 0x120390) != 0x4730 ||
         *(u16*)(rom + 0x11FA52) != 0x6BB9 ||
         *(u16*)(rom + 0x11FA5A) != 0x6BF8 ||
         *(u16*)(rom + 0x18B60C) != 0x4838 ||
@@ -502,11 +506,11 @@ static bool tryPatchSoulgold121()
     *(u16*)(rom + 0x1A3D58) = 0xDF98; // branch after InitFlashTimer, slot 5
     // Keep the proven cache-sync hook, trace subsequent graphics operations.
     *(u16*)(rom + 0x18B60C) = 0xDF9A; // first resource returned
-    *(u16*)(rom + 0x18B618) = 0xDF9B; // second resource returned
-    *(u16*)(rom + 0x18B630) = 0xDF9C; // third resource and four setup calls returned
+    *(u16*)(rom + 0x11F8A4) = 0xDF9B; // type 8: sync first copied routine (r11)
+    *(u16*)(rom + 0x11F8D6) = 0xDF9C; // type 8: sync second copied routine (r6)
     *(u16*)(rom + 0x11FA52) = 0xDF9D; // cache synchronization before copied ARM call
     *(u16*)(rom + 0x11FA5A) = 0xDF9E; // copied ARM routine returned
-    *(u16*)(rom + 0x18B666) = 0xDF9F; // later screen setup reached
+    *(u16*)(rom + 0x18B618) = 0xDF9F; // second resource returned
 
     // The native setup table continues to point into the ROM, but the
     // actual Flash operations dispatch through GBARunner3's save hooks.
