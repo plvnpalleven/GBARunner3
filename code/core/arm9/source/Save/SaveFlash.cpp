@@ -463,6 +463,16 @@ static bool tryPatchSoulgold121()
 
 bool flash_patch1MV103(const SaveTypeInfo* saveTypeInfo, FIL* romFile, u32 tagRomAddress, u8* tempBuffer)
 {
+    // CONTROL BUILD ONLY: deliberately DO NOT patch the known SoulGold ROM.
+    // The save-tag scanner still recognizes FLASH1M_V103. This isolates whether
+    // our Thumb SWI hook caused the white screen; saving is NOT expected to work.
+    if (memcmp((const u8*)ROM_LINEAR_DS_ADDRESS + 0xA0, "Soulgold", 8) == 0 &&
+        memcmp((const u8*)ROM_LINEAR_DS_ADDRESS + 0x204, "RHHEXP", 6) == 0)
+    {
+        GFX_PLTT_BG_SUB[0] = 0x7C00; // blue: original Flash code left untouched
+        return false;
+    }
+
     if (tryPatchSoulgold121() || tryPatchFlash1MV103Gcc())
     {
         initializeFlash1M();
