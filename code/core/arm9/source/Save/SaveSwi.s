@@ -483,6 +483,21 @@ sgVblankWaitEntry:
     ldr r0, sgTraceSavedR0
     movs pc, lr
 
+// Called from the real VM SWI entry with the guest SWI 05 unchanged.
+.global sgTraceVblankBiosDispatch
+sgTraceVblankBiosDispatch:
+    ldr r13, =gSoulgoldTraceEnabled
+    ldrb r13, [r13]
+    cmp r13, #0
+    beq 1f
+    ldr r13, sgTraceCallbackCount
+    cmp r13, #0
+    beq 1f
+    sg_post_stage 0x1E
+1:
+    mov r13, #0
+    ldr pc, =vm_swiSoulgoldResume
+
 sgVblankWaitExit:
     str r0, sgTraceSavedR0
     ldr r13, =sgWaitExitLink
