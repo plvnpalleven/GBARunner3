@@ -48,6 +48,7 @@
 #include "MemoryEmulator/HiCodeCacheMapping.h"
 #include "VirtualMachine/VMNestedIrq.h"
 #include "arm9Clock.h"
+#include "SystemIpc.h"
 
 #define DEFAULT_ROM_FILE_PATH           "/rom.gba"
 #define BIOS_FILE_PATH                  "/_gba/bios.bin"
@@ -511,8 +512,30 @@ extern "C" void gbaRunnerMain(int argc, char* argv[])
     delete sSplashScreen;
     sSplashScreen = nullptr;
 
-    const auto& displaySettings = gAppSettingsService.GetAppSettings().displaySettings;
+    // Diagnostic experiment only: SoulGold's save-library identification is
+    // instrumented to change the bottom screen's palette color. Normally
+    // center+mask uses the SUB engine for the GBA image, and its backlight is
+    // explicitly switched off by ApplyDisplaySettings(). Use the supported
+    // unmasked top-screen path so the bottom screen can show the probe.
+    const bool soulGoldProbe =
+        memcmp((const u8*)ROM_LINEAR_DS_ADDRESS + 0xA0, "Soulgold", 8) == 0 &&
+        memcmp((const u8*)ROM_LINEAR_DS_ADDRESS + 0x204, "RHHEXP", 6) == 0;
+    DisplaySettings displaySettings = gAppSettingsService.GetAppSettings().displaySettings;
+    if (soulGoldProbe)
+    {
+        displaySettings.gbaScreen = GbaScreen::Top;
+        displaySettings.enableCenterAndMask = false;
+    }
     gGbaDisplayConfigurationService.ApplyDisplaySettings(displaySettings);
+    if (soulGoldProbe)
+    {
+        // Preserve the palette state set by the Flash patch. The game uses
+        // the MAIN engine on the top LCD, while the SUB LCD remains a
+        // plain backdrop color, with its backlight actually switched on.
+        REG_DISPCNT_SUB = 0x10000;
+        REG_MASTER_BRIGHT_SUB = 0;
+        sysipc_setBottomBacklight(true);
+    }
     if (displaySettings.enableCenterAndMask)
     {
         gGbaBorderService.SetupBorder(displaySettings.borderImage, gRomHeader.gameCode);
