@@ -9,7 +9,7 @@ arm_func emu_vblankIrq
     ldr r13, =gSoulgoldTraceEnabled
     ldrb r13, [r13]
     cmp r13, #0
-    bne emu_vblankDmaJumpInstruction
+    bne sgVblankSample
     // For center and mask display capture has to be enabled every frame
     // and the buffers need to be swapped
 jumpToCaptureUpdate:
@@ -76,6 +76,19 @@ emu_vblankDmaJumpInstructions:
 #endif
     pop {r0-r3,r12}
     b emu_vblankIrqSkipSaveCheckInstruction
+
+    // vm_irq already saved its original LR at VM_DTCM_BASE + 4.
+    // Keep the fixed-address VMIrq code byte-for-byte unchanged.
+sgVblankSample:
+    ldr sp, =dtcmIrqStackEnd
+    push {r0-r3,r12}
+    ldr r0, =0xFFFFFE6C
+    ldr r0, [r0]
+    sub r0, r0, #4
+    ldr r12, =sgTraceVblankSample
+    blx r12
+    pop {r0-r3,r12}
+    b emu_vblankDmaJumpInstruction
 
 .pool
 .end

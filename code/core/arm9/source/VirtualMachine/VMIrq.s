@@ -29,21 +29,7 @@ arm_func emu_hblankIrqReturn
         bne emu_arm7Irq
 arm_func emu_arm7IrqReturn
     tst r4, #1 // VBLANK IRQ
-        beq emu_vblankIrqReturn
-    ldr r13, =gSoulgoldTraceEnabled
-    ldrb r13, [r13]
-    cmp r13, #0
-        beq emu_vblankIrq
-    // Preserve all guest registers used by the sampler. The real IRQ LR
-    // is already saved in DTCM by vm_irq. Reuse normal IRQ scratch stack.
-    ldr sp, =dtcmIrqStackEnd
-    push {r0-r3,r12}
-    ldr r0, DTCM(vm_irqSavedLR)
-    sub r0, r0, #4
-    ldr r12, =sgTraceVblankSample
-    blx r12
-    pop {r0-r3,r12}
-    b emu_vblankIrq
+        bne emu_vblankIrq
 arm_func emu_vblankIrqReturn
 
     ldr r13, DTCM(vm_hwIrqMask)
