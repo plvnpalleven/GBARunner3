@@ -175,14 +175,19 @@ soulGoldTraceTimer:
     movs pc, lr
 
 // Draw eight hex digits. Guest r0/r12 saved by caller; r13 is banked.
+// Compact loop rather than duplicating 32 ARM instructions per display.
+// Every destination is halfword aligned; eight stores advance 16 bytes.
+// The low six address bits uniquely identify the end over that range.
 .macro sg_hex destination
     ldr r13, =\destination
-    .rept 8
-        mov r12, r0, lsr #28
-        add r12, r12, #16
-        strh r12, [r13], #2
-        mov r0, r0, lsl #4
-    .endr
+.Lsg_hex_loop\@:
+    mov r12, r0, lsr #28
+    add r12, r12, #16
+    strh r12, [r13], #2
+    mov r0, r0, lsl #4
+    and r12, r13, #0x3F
+    cmp r12, #((\destination + 16) & 0x3F)
+    bne .Lsg_hex_loop\@
 .endm
 
 soulGoldTraceRead:
