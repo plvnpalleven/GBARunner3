@@ -189,7 +189,7 @@ soulGoldReadReturn:
 
 // Trace the later resource calls while preserving original literal loads.
 soulGoldTraceResourceOne:
-    ldr r0, =0x086801C4
+    // Guest executed the instruction after the privileged read SWI.
     sg_trace_mark 7, 0x7FE0
     movs pc, lr
 
@@ -282,8 +282,17 @@ soulGoldTraceSecondReturn:
     movs pc, lr
 
 soulGoldTraceResourceReturn:
-    ldr r0, =0x0868054C
+    // Original 0x6863: LDR r3,[r4,#4]. Record only after guest epilogue.
+    ldr r3, [r4, #4]
+    str r0, sgTraceSavedR0
+    ldr r13, =0x0500040E
+    ldrh r0, [r13]
+    ldr r13, =0x7FE0
+    cmp r0, r13
+    ldr r0, sgTraceSavedR0
+    bne 1f
     sg_trace_mark 12, 0x7C00
+1:
     movs pc, lr
 
 .balign 4

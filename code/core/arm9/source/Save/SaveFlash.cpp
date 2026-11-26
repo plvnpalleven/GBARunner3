@@ -477,8 +477,8 @@ static bool tryPatchSoulgold121()
         *(u16*)(rom + 0x1A3D44) != 0x2800 ||
         *(u16*)(rom + 0x1A3D58) != 0xE7F8 ||
         *(u32*)(rom + 0x1A3D5C) != 0x030040BC ||
-        *(u16*)(rom + 0x18B618) != 0x4837 ||
-        *(u32*)(rom + 0x18B6F8) != 0x0868054C ||
+        *(u16*)(rom + 0x1A70C2) != 0x6863 ||
+        *(u16*)(rom + 0x1A710A) != 0x6863 ||
         *(u16*)(rom + 0x11F8A4) != 0x4650 ||
         *(u16*)(rom + 0x11F8D6) != 0x0028 ||
         *(u32*)(rom + 0x11F8F0) != 0x0811F624 ||
@@ -505,12 +505,13 @@ static bool tryPatchSoulgold121()
     *(u16*)(rom + 0x1A3D42) = 0xDF97; // ldr r3,[pc,#24], mark slot 4
     *(u16*)(rom + 0x1A3D58) = 0xDF98; // branch after InitFlashTimer, slot 5
     // Keep the proven cache-sync hook, trace subsequent graphics operations.
-    *(u16*)(rom + 0x18B60C) = 0xDF9A; // first resource returned
+    // Slot 7 now tracks the guest-side Flash-read epilogue.
     *(u16*)(rom + 0x11F8A4) = 0xDF9B; // type 8: sync first copied routine (r11)
     *(u16*)(rom + 0x11F8D6) = 0xDF9C; // type 8: sync second copied routine (r6)
     *(u16*)(rom + 0x11FA52) = 0xDF9D; // cache synchronization before copied ARM call
     *(u16*)(rom + 0x11FA5A) = 0xDF9E; // copied ARM routine returned
-    *(u16*)(rom + 0x18B618) = 0xDF9F; // second resource returned
+    *(u16*)(rom + 0x1A70C2) = 0xDF9F; // main-loop callback load after read
+    *(u16*)(rom + 0x1A710A) = 0xDF9F; // alternate main-loop path
 
     // The native setup table continues to point into the ROM, but the
     // actual Flash operations dispatch through GBARunner3's save hooks.
@@ -519,9 +520,11 @@ static bool tryPatchSoulgold121()
     sav_swiTable[2] = (void*)verifyFlashSector;
     sav_swiTable[3] = (void*)verifyFlash;
     // The guarded readSig also verifies the second Thumb halfword.
-    // Dedicated privileged buffered read returns to BX LR, then to caller.
+    // First return to the guest Thumb epilogue, mark it via a second SWI,
+    // then execute BX LR back to the original game caller.
     *(u16*)(rom + 0x5F04) = 0xDF99;
-    *(u16*)(rom + 0x5F06) = 0x4770;
+    *(u16*)(rom + 0x5F06) = 0xDF9A;
+    *(u16*)(rom + 0x5F08) = 0x4770;
     *(u16*)(rom + 0x5FD8) = SAVE_THUMB_SWI(2);
     *(u16*)(rom + 0x607C) = SAVE_THUMB_SWI(3);
     *(u16*)(rom + 0x64A4) = SAVE_THUMB_SWI(8);
