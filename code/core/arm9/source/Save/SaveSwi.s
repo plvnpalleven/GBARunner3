@@ -638,14 +638,14 @@ sgTraceInvalidFetch:
     ldr r13, =sgTraceFaultRegs
     stmia r13, {sp,lr}^
     nop
-    ldr r0, sgCpuSetSource
-    sg_hex 0x062042C4 // CpuSet source
-    ldr r0, sgCpuSetDestination
-    sg_hex 0x062042DC // CpuSet destination
-    ldr r0, sgCpuSetControl
-    sg_hex 0x06204544 // CpuSet control
-    ldr r0, sgCpuSetReturn
-    sg_hex 0x0620455C // actual BIOS SWI return destination; zero until observed
+    ldr r0, sgLastHicodeMiss
+    sg_hex 0x062042C4 // exact last high-ROM undefined miss PC
+    ldr r0, sgLastHicodeIndex
+    sg_hex 0x062042DC // cache debug index readback for that miss
+    ldr r0, sgLastHicodePrefetch
+    sg_hex 0x06204544 // last high-ROM prefetch mapping PC
+    ldr r0, sgTraceFaultRegs + 4
+    sg_hex 0x0620455C // live guest LR at invalid fetch
     ldr r13, =memu_biosOpcodeId
     ldrb r0, [r13]
     mov r0, r0, lsl #16
@@ -654,13 +654,21 @@ sgTraceInvalidFetch:
     orr r0, r0, r13, lsl #8
     ldr r13, sgFaultCallStage
     orr r0, r0, r13
-    ldr r13, sgLastSwiOpcode
-    orr r0, r0, r13, lsl #24
-    sg_hex 0x06204044 // OO BB CC SS: SWI immediate, BIOS phase, VM CPSR, stage
+    orr r0, r0, #0x46000000
+    sg_hex 0x06204044 // 46 BB CC SS: build ID, BIOS phase, VM CPSR, stage
 1:
     b 1b
 
 .balign 4
+.global sgLastHicodeMiss
+sgLastHicodeMiss:
+    .word 0
+.global sgLastHicodeIndex
+sgLastHicodeIndex:
+    .word 0
+.global sgLastHicodePrefetch
+sgLastHicodePrefetch:
+    .word 0
 sgCpuSetSource:
     .word 0
 sgCpuSetDestination:

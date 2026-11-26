@@ -33,6 +33,10 @@ arm_func memu_prefetchAbort
 #ifdef GBAR3_HICODE_CACHE_MAPPING
     ldr sp,= dtcmHicodeStackEnd
     push {r0-r3, r12, lr}
+#ifndef GBAR3_TEST
+    ldr r3, =sgLastHicodePrefetch
+    str lr, [r3]
+#endif
     mov r0, lr
     bl hic_mapRomBlock
     ldmfd sp, {r0-r3, r12, pc}^

@@ -34,8 +34,22 @@ arm_func hic_undefinedHicodeMiss
     bne notHicodeMiss
 1:
     pop {r3,r12}
-    mrc p15, 3, lr, c15, c0, 0 // get index (=instruction address)
+    // Recover the exact faulting PC from LR_und and SPSR.T. The cache
+    // debug index is a word selector, not a reliable Thumb resume PC.
+    push {r0-r3,r12}
+    mrs r12, spsr
+    tst r12, #0x20
+    subeq lr, lr, #4
+    subne lr, lr, #2
+    pop {r0-r3,r12}
     push {r0-r3,r12,lr}
+#ifndef GBAR3_TEST
+    ldr r3, =sgLastHicodeMiss
+    str lr, [r3]
+    mrc p15, 3, r12, c15, c0, 0
+    ldr r3, =sgLastHicodeIndex
+    str r12, [r3]
+#endif
     mov r0, lr
     bl hic_mapRomBlock
     ldmfd sp, {r0-r3,r12,pc}^
