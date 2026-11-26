@@ -602,7 +602,7 @@ sgVerifyMixerCopy:
     cmp r2, r3
     blo 3b
     ldr r0, sgFaultCallStage
-    orr r0, r0, #0x55000000
+    orr r0, r0, #0x56000000
     sg_hex 0x06204044
     ldr r1, sgMixerSavedR1
     ldr r2, sgMixerSavedR2
@@ -640,8 +640,8 @@ sgTraceInvalidFetch:
     orr r0, r0, r13, lsl #8
     ldr r13, sgFaultCallStage
     orr r0, r0, r13
-    orr r0, r0, #0x55000000
-    sg_hex 0x06204044 // 55 BB CC SS: build ID, BIOS phase, VM CPSR, copy status
+    orr r0, r0, #0x56000000
+    sg_hex 0x06204044 // 56 BB CC SS: build ID, BIOS phase, VM CPSR, copy status
 1:
     b 1b
 

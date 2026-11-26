@@ -101,8 +101,12 @@ static inline void addBlock(u32 gbaAddress, const u8* romBlockData)
 
 ITCM_CODE void hic_mapRomBlock(u32 gbaAddress)
 {
-    gbaAddress &= ~0x06000000;
-    const u8* romBlockData = sdc_getRomBlockWithoutIrqYielding(gbaAddress);
+    // Cartridge wait-state mirrors (08/0A/0C) share the same ROM bytes,
+    // but the CPU still executes at its original virtual address.
+    // Normalize the backing SD read only. Keep the requested address for
+    // the MPU region, instruction-cache tags, and last-block tracking.
+    const u32 canonicalAddress = gbaAddress & ~0x06000000;
+    const u8* romBlockData = sdc_getRomBlockWithoutIrqYielding(canonicalAddress);
 
     u32 region4Config = mpu_getRegion4();
     if ((region4Config & 1) && (gHicodeState.lastHicodeBlock & ~0x7FF) == (gbaAddress & ~0x7FF))
